@@ -14,47 +14,45 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
 - **Balance deep focus** with biological recovery.
 - **Surface proactive micro-resets** before fatigue compounds.
 - **Maintain sustainable energy** across long design, development, and engineering sessions.
+- **Protect user privacy** with client-side local persistence and zero invasive keylogging.
 
 ---
 
-## 🚀 Sprint 1: Foundation & Dashboard
+## 🚀 Sprint Milestones
 
-Sprint 1 delivers the production-ready foundation and comprehensive interactive dashboard:
+### Sprint 1: Foundation & Dashboard (Completed)
+- **Modern Calming Design System**: Warm sand palette (`#FAF9F5`), muted sage greens (`#3D6B42`), and clean responsive layouts without distracting animations.
+- **Interactive Wellness Dashboard**: Personalized welcome banner, workday screen-time overview, focus session summary, wellness score gauge (87/100), hydration tracker, break reminders, weekly bar chart, recommended wellness actions, and activity stream.
+- **Working Pomodoro Engine**: 25m Focus / 5m Short Break / 15m Long Break intervals, circular countdown visual, and native Web Audio 528Hz harmonic singing bowl chime.
+- **Supporting Views**: My Wellness, Activity, Insights, and Settings.
 
-### 1. Modern Wellness Design System
-- Calming visual identity built with warm neutrals (`#FAF9F5`), muted sage greens (`#3D6B42`, `#538A58`), sand tones, and subtle terracotta/sky accents.
-- Purposefully avoids excessive gradients, heavy glassmorphism, or distracting animations to preserve user focus and calm.
-- Fully responsive across desktop, tablet, and mobile with persistent sidebar and touch-friendly navigation.
-
-### 2. Comprehensive Wellness Dashboard
-- **Personalized Welcome Section**: Contextual time-of-day greeting, day metrics snapshot, and interactive mood/energy logger.
-- **Today's Screen-Time Overview**: Active display exposure, category breakdown (Focus & Code, Architecture Review, Team Sync, Documentation), continuous screen block monitor, and fatigue delta vs yesterday.
-- **Focus Session Summary & Streak**: Deep work blocks completed (e.g. 4/6), 7-day consistency streak, and one-click session triggers.
-- **Working Focus Session Timer**: Full Pomodoro engine with 25m Focus, 5m Short Break, and 15m Long Break intervals, circular countdown visual, task intention input, and calm Tibetan singing bowl harmonic chime (Web Audio API synthetic oscillator).
-- **Daily Wellness Score (87/100)**: Multi-dimensional score breakdown covering Physical Ergonomics (84%), Mental Focus Quality (92%), Work Cadence (89%), and Rest Recovery (82%), accompanied by AI wellness observations.
-- **Hydration Tracker Card**: Interactive glass-by-glass logging (+ / -), daily volume tracking (1,250ml / 2,000ml target), and last logged timestamp.
-- **Break & Habit Reminders**: Adaptive prompts (hydration check, 20-20-20 eye relaxation, ergonomic shoulder rolls) with Snooze (+15m) and Mark Complete controls.
-- **Weekly Activity Cadence**: 7-day visualization with dynamic metric switcher (Focus Hours, Screen Hours, Wellness Score).
-- **Recommended Wellness Actions**: Context-aware interventions (4-7-8 parasympathetic breathing, visual depth shifts, sub-occipital neck release) with completion toggles.
-- **Chronological Activity Timeline**: Real-time event log with category filtering (Focus, Breaks, Movement, Hydration, Wellbeing) and custom activity entry support.
-
-### 3. Holistic Application Views
-- **Dashboard**: Primary operations and high-level vitals.
-- **My Wellness**: Deep-dive wellness dimensions, live 4-7-8 breathing coach, and mood history journal.
-- **Activity**: Searchable, filterable event history with JSON data export.
-- **Insights**: AI-inspired cognitive pattern analysis, peak focus window detection, and circadian cadence mapping.
-- **Settings**: Customizable daily goals (screen time limits, target focus blocks, hydration targets), break frequencies, and sensory audio controls.
+### Sprint 2: Work-Pattern Tracking & Storage Engine (Completed)
+- **Persistent Storage (IndexedDB)**: Engineered zero-dependency `MindoraStorage` across 6 Object Stores (`activities`, `focus_sessions`, `hydration_logs`, `app_usage`, `mood_entries`, `user_settings`). Restores state across browser refreshes and restarts without losing history.
+- **Decoupled Telemetry Pipeline**: Built `BrowserInAppTelemetryProvider` to monitor tab visibility (`document.visibilityState`) and user presence/idle states. Structured under `ITelemetryProvider` contract for future desktop daemon integration.
+- **Work Pattern Analytics**:
+  - Live calculation of daily focus duration and completed session counts.
+  - Real-time tracking of average session lengths.
+  - Work-to-break rhythm ratio analysis.
+  - **Dual Screen-Time Metrics**: Distinguishes **Verified In-App Active Time** (directly tracked presence inside Mindora) from **Estimated Workday Screen Time** (modeled full day exposure).
+  - Prolonged continuous focus session warnings ($\ge 50$ min strain threshold).
+- **Date-Based Activity Filtering**: Query and filter activity history by **Today**, **Yesterday**, **Past 7 Days**, or **All Time**, alongside category filters and real-time search.
+- **Privacy & Sovereignty**:
+  - Live header tracking indicator (`● Tracking: In-App Active` / `Tracking: Idle`).
+  - Zero keystroke collection, zero screenshot capture, and local-only data retention.
+  - One-click **Clear Stored Activity Data** with confirmation modal in Settings and Activity views.
+  - Full **Export JSON Archive** for complete user data portability.
 
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
 - **Core Framework**: React 18 + TypeScript (Strict Type Safety)
-- **Styling**: Tailwind CSS with custom calming wellness theme extensions
+- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v1) with zero third-party bundle overhead
+- **Styling**: Tailwind CSS with custom calming wellness theme tokens
 - **Build Tool**: Vite 6 (ultra-fast HMR and optimized production bundles)
 - **Icons**: Lucide React
-- **Audio Synthesis**: Native Web Audio API (zero external sound dependencies)
-- **State Management**: React Context (`WellnessContext`) with encapsulated domain reducers and persistent mock data models
+- **Audio Synthesis**: Native Web Audio API (528Hz harmonic oscillator)
+- **Telemetry Engine**: Modular `WorkPatternService` + `BrowserInAppTelemetryProvider` decoupled from presentation layer
 
 ---
 
@@ -105,24 +103,34 @@ Sprint 1 delivers the production-ready foundation and comprehensive interactive 
 ```
 mindora/
 ├── docs/
-│   ├── architecture.md       # Technical architecture specification
-│   └── SPRINTS.md            # Sprint tracking and release milestones
+│   ├── architecture.md           # System architecture, storage decisions, and telemetry contracts
+│   └── SPRINTS.md                # Sprint roadmaps and changelogs
 ├── src/
 │   ├── components/
-│   │   ├── common/           # Atomic UI elements (Button, Badge, Card, Modal, ProgressBar, CircularProgress)
-│   │   ├── layout/           # Sidebar, Header, MobileNav, AppLayout
-│   │   ├── dashboard/        # WelcomeSection, ScreenTimeCard, FocusSummaryCard, FocusTimerModal, etc.
-│   │   └── views/            # DashboardView, MyWellnessView, ActivityView, InsightsView, SettingsView
+│   │   ├── common/               # Atomic UI components (Badge, Button, Card, CircularProgress, Modal, ProgressBar)
+│   │   ├── layout/               # Header, Sidebar, MobileNav, AppLayout
+│   │   ├── dashboard/            # WelcomeSection, ScreenTimeCard, FocusSummaryCard, FocusTimerModal, etc.
+│   │   └── views/                # DashboardView, MyWellnessView, ActivityView, InsightsView, SettingsView
 │   ├── context/
-│   │   └── WellnessContext.tsx # Central wellness state management & actions
+│   │   └── WellnessContext.tsx   # Central state, storage hydration, and analytics synchronization
 │   ├── data/
-│   │   └── mockData.ts       # Cohesive realistic wellness dataset
+│   │   └── mockData.ts           # Initial baseline and seeding dataset
+│   ├── hooks/
+│   │   ├── useAppActiveTimeTracker.ts  # Presence heartbeat and in-app time tracker
+│   │   └── useWorkPatternTracker.ts    # Reusable analytics and logging hook
+│   ├── services/
+│   │   ├── storage/
+│   │   │   └── indexedDb.ts      # Type-safe native IndexedDB storage engine
+│   │   └── tracking/
+│   │       ├── telemetryInterfaces.ts  # ITelemetryProvider and BrowserInAppTelemetryProvider
+│   │       └── workPatternService.ts   # WorkPatternService analytics and event engine
 │   ├── styles/
-│   │   └── index.css         # Tailwind base directives and calm styling
+│   │   └── index.css             # Tailwind base directives and calm styling
 │   ├── types/
-│   │   └── index.ts          # Strongly typed domain entities
-│   ├── App.tsx               # View router and layout container
-│   └── main.tsx              # Application entry point
+│   │   ├── index.ts              # Core domain models
+│   │   └── tracking.ts           # ActivityEvent, FocusSessionRecord, Analytics, and Telemetry types
+│   ├── App.tsx                   # Main view router
+│   └── main.tsx                  # Application entry point
 ├── index.html
 ├── package.json
 ├── postcss.config.js
@@ -133,12 +141,13 @@ mindora/
 
 ---
 
-## 🌿 Wellness Principles
+## 🔒 Privacy Invariants
 
-1. **Gentle Accountability**: Encourage positive habit loops rather than punitive warnings.
-2. **Cognitive Ergonomics**: Protect flow state by batching notifications at natural transition boundaries.
-3. **Calm Aesthetic**: Warm neutrals and soft earthen tones prevent digital overstimulation.
-4. **Data Sovereignty**: Zero invasive telemetry; mock data used safely until local AI integration in future sprints.
+1. **Local-Only Storage**: Telemetry and sessions are persisted exclusively in client-side IndexedDB.
+2. **Zero Keystroke Logging**: The application measures only user presence timestamps to compute active vs idle state; key values are never inspected.
+3. **Zero Screenshot / Pixel Scraping**: Mindora never attempts to record screen pixels or application contents.
+4. **Transparent Tracking State**: A persistent status badge in the header shows whether tracking is active or idle.
+5. **Right to Erasure**: Users can permanently erase all stored sessions at any time with a single click.
 
 ---
 

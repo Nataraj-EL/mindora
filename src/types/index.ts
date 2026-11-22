@@ -25,10 +25,12 @@ export interface ScreenTimeCategoryBreakdown {
 
 export interface ScreenTimeData {
   totalMinutes: number;
+  inAppActiveMinutes: number; // Actual tracked in-app time in Mindora
   maxTargetMinutes: number;
   activeContinuousMinutes: number;
   continuousStrainThresholdMinutes: number;
   changeVsYesterdayMinutes: number; // positive = more screen time, negative = less
+  isEstimatedSystemTotal: boolean;
   categories: ScreenTimeCategoryBreakdown[];
 }
 

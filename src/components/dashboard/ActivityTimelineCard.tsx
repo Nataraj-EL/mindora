@@ -8,16 +8,21 @@ import {
   Coffee,
   Sparkles,
   Plus,
+  Calendar,
+  Database,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { Card } from '../common/Card';
 import { ActivityCategory } from '../../types';
+import { DateFilterOption } from '../../types/tracking';
 
 export const ActivityTimelineCard: React.FC = () => {
   const {
     timeline,
     timelineCategoryFilter,
     setTimelineCategoryFilter,
+    timelineDateFilter,
+    setTimelineDateFilter,
     addTimelineItem,
   } = useWellness();
 
@@ -71,10 +76,10 @@ export const ActivityTimelineCard: React.FC = () => {
     }
   };
 
-  const handleCreateActivity = (e: React.FormEvent) => {
+  const handleCreateActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    addTimelineItem({
+    await addTimelineItem({
       title: newTitle.trim(),
       description: newDesc.trim() || 'Mindful habit logged.',
       category: newCategory,
@@ -85,8 +90,15 @@ export const ActivityTimelineCard: React.FC = () => {
     setShowAddModal(false);
   };
 
-  const filterTabs: { id: 'all' | ActivityCategory; label: string }[] = [
-    { id: 'all', label: 'All' },
+  const dateFilterTabs: { id: DateFilterOption; label: string }[] = [
+    { id: 'today', label: 'Today' },
+    { id: 'yesterday', label: 'Yesterday' },
+    { id: 'past_7_days', label: 'Past 7 Days' },
+    { id: 'all', label: 'All Time' },
+  ];
+
+  const categoryFilterTabs: { id: 'all' | ActivityCategory; label: string }[] = [
+    { id: 'all', label: 'All Types' },
     { id: 'focus', label: 'Focus' },
     { id: 'break', label: 'Breaks' },
     { id: 'hydration', label: 'Hydration' },
@@ -104,18 +116,63 @@ export const ActivityTimelineCard: React.FC = () => {
               <Clock className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">Today's Activity Stream</h3>
-              <p className="text-xs text-stone-500">Real-time work sessions & recovery log</p>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-stone-900">Activity Stream</h3>
+                <span className="text-[10px] font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 flex items-center gap-1">
+                  <Database className="w-2.5 h-2.5" />
+                  IndexedDB
+                </span>
+              </div>
+              <p className="text-xs text-stone-500">Persistent work sessions, breaks, and habits</p>
             </div>
           </div>
 
           <button
             onClick={() => setShowAddModal(!showAddModal)}
-            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sand-100 hover:bg-sand-200 text-stone-800 transition-colors cursor-pointer"
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sand-100 hover:bg-sand-200 text-stone-800 transition-colors cursor-pointer border border-sand-200/60"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Log Activity</span>
           </button>
+        </div>
+
+        {/* Date Filter & Category Pills Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4 pb-3 border-b border-sand-100">
+          {/* Date Selector */}
+          <div className="flex items-center gap-1 p-1 bg-sand-100 rounded-xl text-xs overflow-x-auto">
+            <Calendar className="w-3.5 h-3.5 text-stone-400 mx-1 shrink-0" />
+            {dateFilterTabs.map((df) => (
+              <button
+                key={df.id}
+                onClick={() => setTimelineDateFilter(df.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                  timelineDateFilter === df.id
+                    ? 'bg-white text-stone-900 font-semibold shadow-2xs'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                {df.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <Filter className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+            {categoryFilterTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTimelineCategoryFilter(tab.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                  timelineCategoryFilter === tab.id
+                    ? 'bg-sage-700 text-white font-semibold'
+                    : 'bg-sand-100/70 text-stone-600 hover:text-stone-900 hover:bg-sand-200/80'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Add Quick Activity Form Drawer */}
@@ -159,13 +216,13 @@ export const ActivityTimelineCard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-3 py-1 rounded-md text-stone-500 hover:text-stone-800"
+                className="px-3 py-1 rounded-md text-stone-500 hover:text-stone-800 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 bg-sage-700 text-white rounded-md font-semibold hover:bg-sage-800"
+                className="px-3 py-1 bg-sage-700 text-white rounded-md font-semibold hover:bg-sage-800 cursor-pointer"
               >
                 Save
               </button>
@@ -173,29 +230,15 @@ export const ActivityTimelineCard: React.FC = () => {
           </form>
         )}
 
-        {/* Category Filters Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-none">
-          <Filter className="w-3.5 h-3.5 text-stone-400 shrink-0 mr-1" />
-          {filterTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setTimelineCategoryFilter(tab.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                timelineCategoryFilter === tab.id
-                  ? 'bg-sage-700 text-white font-semibold'
-                  : 'bg-sand-100/80 text-stone-600 hover:text-stone-900 hover:bg-sand-200/80'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {/* Timeline List */}
         <div className="relative pl-6 space-y-4 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-sand-200">
           {filteredTimeline.length === 0 ? (
-            <div className="p-6 text-center text-xs text-stone-400">
-              No activity logged in this category today yet.
+            <div className="p-8 text-center text-xs text-stone-400 bg-sand-50/50 rounded-xl border border-dashed border-sand-200">
+              <Calendar className="w-6 h-6 text-stone-300 mx-auto mb-2" />
+              <p className="font-semibold text-stone-700">No recorded activities for this filter.</p>
+              <p className="text-[11px] text-stone-500 mt-0.5">
+                Complete a focus session, log water, or click "Log Activity" to record a mindful event.
+              </p>
             </div>
           ) : (
             filteredTimeline.map((item) => {

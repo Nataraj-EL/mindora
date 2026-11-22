@@ -1,6 +1,6 @@
-# Mindora — Initial Architecture Specification
+# Mindora — System Architecture Specification
 
-**Version:** 1.0.0 (Sprint 1: Foundation & Dashboard)  
+**Version:** 2.0.0 (Sprint 2: Work-Pattern Tracking & Persistent Telemetry)  
 **Status:** Approved  
 **Author:** Lead Full-Stack Engineer  
 
@@ -8,12 +8,13 @@
 
 ## 1. System Vision & Architecture Principles
 
-Mindora is engineered as an AI-powered personalized mental wellness companion tailored for high-focus technical and creative knowledge workers. The architecture adheres to four core pillars:
+Mindora is engineered as an AI-powered personalized mental wellness companion tailored for high-focus technical and creative knowledge workers. The architecture adheres to five core pillars:
 
-1. **Calm Technology Philosophy**: The interface is intentionally free of abrasive alerts, flashing animations, and cognitive clutter. Subtle earthen palettes, muted sage greens, and warm sand neutrals foster sustained composure.
-2. **Strict Type Safety**: End-to-end domain modeling in TypeScript eliminates runtime type mismatches and establishes explicit contracts for all wellness entities.
-3. **Atomic & Modular Component Architecture**: Reusable UI primitives (`Card`, `Badge`, `Button`, `ProgressBar`, `CircularProgress`, `Modal`) decouple visual representation from domain logic.
-4. **Predictable Unidirectional State Flow**: Centralized state management via React Context (`WellnessContext`) enables consistent real-time updates across multiple widgets without prop drilling or external state overhead.
+1. **Calm Technology Philosophy**: Free of abrasive alerts, flashing animations, and cognitive clutter. Subtle earthen palettes, muted sage greens, and warm sand neutrals foster sustained composure.
+2. **Local Data Sovereignty**: All activities, focus sessions, hydration logs, and preferences are stored exclusively on the user’s device via **IndexedDB** (`mindora_wellness_db`). Zero personal telemetry or activity events are sent to external cloud servers.
+3. **Strict Type Safety**: End-to-end domain modeling in TypeScript eliminates runtime type mismatches and establishes explicit contracts for all wellness and tracking entities.
+4. **Decoupled Telemetry Pipeline**: Tracking engines (`BrowserInAppTelemetryProvider`, `WorkPatternService`) operate independently of the React presentation layer, making the system pluggable for native desktop daemons.
+5. **Privacy by Design**: Telemetry strictly measures temporal presence and session boundaries. It **never** captures keystroke values, screen pixels, clipboard data, or file system contents.
 
 ---
 
@@ -24,173 +25,149 @@ flowchart TD
     subgraph UI_Layer ["Presentation Layer (React 18 + Tailwind CSS)"]
         AL["AppLayout"]
         SB["Sidebar"]
-        HD["Header"]
+        HD["Header (Live Tracking Status)"]
         MN["MobileNav"]
         VR["MainViewRenderer"]
         
         subgraph Views ["Application Views"]
             DV["DashboardView"]
             WV["MyWellnessView"]
-            AV["ActivityView"]
-            IV["InsightsView"]
-            SV["SettingsView"]
+            AV["ActivityView (History & Export)"]
+            IV["InsightsView (Cadence Maps)"]
+            SV["SettingsView (Data & Privacy)"]
         end
         
         subgraph DashboardComponents ["Dashboard Widgets"]
             WS["WelcomeSection"]
-            ST["ScreenTimeCard"]
-            FS["FocusSummaryCard"]
-            FT["FocusTimerModal"]
+            ST["ScreenTimeCard (In-App vs Est.)"]
+            FS["FocusSummaryCard (Dynamic Averages)"]
+            FT["FocusTimerModal (Web Audio)"]
             WSC["WellnessScoreCard"]
             RC["RemindersCard"]
             HC["HydrationTrackerCard"]
-            WAC["WeeklyActivityCard"]
+            WAC["WeeklyActivityCard (7-Day Dynamic)"]
             WRA["WellnessActionsCard"]
-            AT["ActivityTimelineCard"]
+            AT["ActivityTimelineCard (Date Filter)"]
         end
     end
 
     subgraph State_Layer ["Domain State Layer"]
         WC["WellnessContext & Provider"]
-        FTM["Timer State Engine (Pomodoro + Interval Hooks)"]
-        HLM["Hydration & Score Calculator"]
-        TLM["Timeline & Filter Store"]
+        UAT["useAppActiveTimeTracker Hook"]
+        WPT["useWorkPatternTracker Hook"]
+    end
+
+    subgraph Service_Layer ["Services & Telemetry Engine"]
+        WPS["WorkPatternService (Analytics Engine)"]
+        BTP["BrowserInAppTelemetryProvider (Presence & Visibility)"]
+        ITP["IDesktopTelemetryProvider (Future Desktop Stub)"]
         AUD["Web Audio Synthesizer (528Hz Sine Wave)"]
     end
 
-    subgraph Data_Layer ["Mock Data & Storage Layer"]
-        MD["mockData.ts (Realistic Seed Profiles)"]
-        DT["Domain Types (types/index.ts)"]
+    subgraph Storage_Layer ["Client-Side Storage (IndexedDB)"]
+        IDB["MindoraStorage ('mindora_wellness_db')"]
+        S1[("activities")]
+        S2[("focus_sessions")]
+        S3[("hydration_logs")]
+        S4[("app_usage")]
+        S5[("mood_entries")]
+        S6[("user_settings")]
     end
 
-    AL --> SB
-    AL --> HD
-    AL --> MN
-    AL --> VR
+    AL --> SB & HD & MN & VR
     VR --> DV & WV & AV & IV & SV
     DV --> WS & ST & FS & WSC & RC & HC & WAC & WRA & AT
-    FS --> FT
     
     UI_Layer --> WC
-    WC --> FTM & HLM & TLM & AUD
-    WC --> MD
-    MD --> DT
+    WC --> UAT & WPT
+    UAT --> BTP
+    WPT --> WPS
+    BTP -.-> ITP
+    WPS --> IDB
+    IDB --> S1 & S2 & S3 & S4 & S5 & S6
+    WC --> AUD
 ```
 
 ---
 
-## 3. Component Hierarchy
+## 3. Storage Architecture Decision: IndexedDB
 
-### 3.1 Common UI Primitives (`src/components/common/`)
-- **`Card`**: Standardized elevation container with gentle sand borders (`border-sand-200/90`), white background, and customizable padding variants.
-- **`Badge`**: Pill indicators featuring semantic color variants (`sage`, `sand`, `clay`, `sky`, `amber`, `stone`) and optional micro-icons.
-- **`Button`**: Accessible interactive element supporting primary, soft-sage, secondary, outline, ghost, and danger styling.
-- **`Modal`**: Backdrop-blurred accessible dialog with keyboard `Escape` dismissal, focus capture, and scroll locking.
-- **`ProgressBar`**: Smooth horizontal progression indicator with customizable track and fill tokens.
-- **`CircularProgress`**: SVG-based dynamic radial progress ring with `stroke-dashoffset` interpolation for wellness scores and timers.
+### Why IndexedDB?
+Sprint 2 introduced persistent tracking to replace mock data. We evaluated three client-side browser storage mechanisms:
 
-### 3.2 Layout System (`src/components/layout/`)
-- **`Sidebar`**: Persistent desktop navigation drawer featuring Mindora brand insignia, primary navigation items with badge counters, real-time focus companion mini-pod, quick hydration meter, and user profile miniature.
-- **`Header`**: Sticky header housing breadcrumb titles, today’s date pill, quick-tap hydration logger (`+250ml`), focus timer trigger, and pending notification badge.
-- **`MobileNav`**: Dual-mode mobile system featuring a bottom tab bar for thumb-driven navigation and an off-canvas slide-over drawer for deep links.
-- **`AppLayout`**: Structural wrapper orchestrating the responsive grid and hosting the global `FocusTimerModal`.
+| Storage Solution | Storage Limit | Async / Non-blocking | Indexing & Queries | Structured Schemas | Decision |
+|---|---|---|---|---|---|
+| `localStorage` | ~5 MB | No (blocks main thread) | No (key string only) | No | Rejected for activity streams |
+| `IndexedDB` | > 500 MB (quota based) | **Yes (fully async)** | **Yes (dateKey, category)** | **Yes (Object Stores)** | **Adopted (Zero Dependencies)** |
+| SQLite (Wasm) | High | Async | Yes | Yes | Deferred (added 2MB+ Wasm overhead) |
 
-### 3.3 Dashboard Architecture (`src/components/dashboard/`)
-1. **`WelcomeSection`**: Time-of-day contextual greeting ("Good morning / afternoon / evening"), current workday summary, and interactive 5-point state-of-mind logger.
-2. **`ScreenTimeCard`**: Total screen time vs limit budget, continuous strain threshold alerts, and segmented category bar chart.
-3. **`FocusSummaryCard`**: Completed vs targeted focus blocks, current daily streak, and timer preview widget.
-4. **`FocusTimerModal`**: Dedicated focus session engine with 25m Focus, 5m Short Break, and 15m Long Break presets, circular countdown, intention input, and Web Audio harmonic chime.
-5. **`WellnessScoreCard`**: Aggregate daily score (0–100) with dimension breakdown (Physical, Mental Focus, Rhythm, Rest Recovery) and AI observation summaries.
-6. **`RemindersCard`**: Upcoming/due reminders with filterable tabs (Due vs Done), 15-minute snooze controls, and complete actions.
-7. **`HydrationTrackerCard`**: Visual glass indicators (8x 250ml units), addition/subtraction buttons, and real-time timeline logging.
-8. **`WeeklyActivityCard`**: 7-day bar chart with metric selector (Focus Hours, Screen Hours, Wellness Score) and interactive tooltip inspection.
-9. **`WellnessActionsCard`**: Actionable protocols (4-7-8 breathing, neck release, eye depth shift) with completion toggle feedback.
-10. **`ActivityTimelineCard`**: Chronological event stream with category pills (Focus, Breaks, Movement, Hydration, Mindfulness) and custom activity entry drawer.
+### Object Stores Specification (`mindora_wellness_db` v1)
+1. **`activities`**: Primary event log.
+   - Key: `id` (e.g., `act_1732274400_abc`)
+   - Indices: `by_dateKey` (`YYYY-MM-DD`), `by_category`, `by_timestamp`
+2. **`focus_sessions`**: Completed and active Pomodoro / deep flow intervals.
+   - Key: `id` (e.g., `sess_1732274400_xyz`)
+   - Indices: `by_dateKey`, `by_completedAt`
+3. **`hydration_logs`**: Volume records of water intake.
+   - Key: `id`
+   - Indices: `by_dateKey`
+4. **`app_usage`**: In-app temporal active presence and continuous strain stretches.
+   - Key: `dateKey` (`YYYY-MM-DD`)
+5. **`mood_entries`**: Subjective emotional & energy state check-ins.
+   - Key: `id`
+   - Indices: `by_dateKey`
+6. **`user_settings`**: Daily goals, reminders cadence, and sensory audio preferences.
+   - Key: `key`
 
 ---
 
-## 4. State Management & Data Flow
+## 4. Telemetry & Tracking Architecture
 
-### 4.1 State Distribution (`WellnessContext.tsx`)
-The application encapsulates state in `WellnessContext`, exposing reactive accessors and dispatchers:
+### 4.1 Telemetry Interfaces (`telemetryInterfaces.ts`)
+To maintain zero coupling between tracking mechanisms and the user interface, telemetry adheres to a provider contract:
 
 ```typescript
-interface WellnessContextType {
-  activeTab: NavigationTab;
-  setActiveTab: (tab: NavigationTab) => void;
-  user: UserProfile;
-  updateUserGoals: (goals: Partial<UserProfile['dailyGoals']>) => void;
-  screenTime: ScreenTimeData;
-  wellnessScore: WellnessScoreData;
-  recalculateWellnessScore: () => void;
-  focusSummary: FocusSessionSummary;
-  focusTimer: FocusTimerState;
-  isTimerModalOpen: boolean;
-  setIsTimerModalOpen: (open: boolean) => void;
-  setTimerMode: (mode: FocusTimerMode) => void;
-  startTimer: () => void;
-  pauseTimer: () => void;
-  resetTimer: () => void;
-  skipTimer: () => void;
-  toggleSound: () => void;
-  setActiveTaskName: (name: string) => void;
-  hydration: HydrationLog;
-  logGlassOfWater: () => void;
-  removeGlassOfWater: () => void;
-  reminders: ReminderItem[];
-  completeReminder: (id: string) => void;
-  snoozeReminder: (id: string) => void;
-  dismissReminder: (id: string) => void;
-  timeline: ActivityTimelineItem[];
-  timelineCategoryFilter: 'all' | ActivityCategory;
-  setTimelineCategoryFilter: (filter: 'all' | ActivityCategory) => void;
-  addTimelineItem: (item: Omit<ActivityTimelineItem, 'id' | 'timestamp' | 'timeDisplay'>) => void;
-  weeklyActivity: DayActivityData[];
-  weeklyMetric: 'screenTime' | 'focus' | 'wellness';
-  setWeeklyMetric: (metric: 'screenTime' | 'focus' | 'wellness') => void;
-  recommendedActions: RecommendedWellnessAction[];
-  toggleActionCompletion: (id: string) => void;
-  moodEntries: MoodEntry[];
-  logMood: (level: 1 | 2 | 3 | 4 | 5, label: string, note?: string) => void;
-  insights: WellnessInsightItem[];
+export interface ITelemetryProvider {
+  initialize(): void;
+  dispose(): void;
+  onPresenceChange(callback: (isActive: boolean) => void): () => void;
+  onVisibilityChange(callback: (isVisible: boolean) => void): () => void;
+  isCurrentlyActive(): boolean;
+  getMetadata(): TelemetryMetadata;
 }
 ```
 
-### 4.2 Web Audio Synthesis
-Rather than bundling binary `.mp3` or `.wav` sound files, Mindora synthesizes a soothing 528Hz Tibetan singing bowl tone using the browser’s native `AudioContext`:
-- Pure sine oscillator (`osc.type = 'sine'`)
-- Soft attack (50ms exponential ramp up to 0.2 gain)
-- Natural acoustic exponential decay (1200ms ring-down)
-- Complete offline capability and zero network overhead.
+### 4.2 BrowserInAppTelemetryProvider
+- **Tab Visibility**: Subscribes to `document.visibilitychange`. If the user minimizes the browser or navigates to another tab, presence transitions to inactive, stopping in-app screen time accumulation.
+- **Presence & Idle Detection**: Listens to passive window events (`pointermove`, `pointerdown`, `scroll`, `wheel`). Resets an idle timeout (60 seconds threshold).
+- **Privacy Enforcement**: **No keyboard character capture** (`e.key` is ignored; only interaction timestamps are noted). Zero audio, camera, or screen scraping.
+
+### 4.3 WorkPatternService
+Encapsulates analytics algorithms:
+- **Daily Focus Duration**: Sums completed sessions for `dateKey`.
+- **Average Focus Length**: Computes `totalFocusMinutes / completedSessions`.
+- **Focus-to-Break Cadence**: Formats ratio of deep work minutes to restorative pause minutes.
+- **Continuous Stretch Strain Detection**: Tracks continuous activity without a >= 5 min break; flags strain warning if continuous duration $\ge 50$ minutes.
+- **7-Day Dynamic Activity Trend**: Aggregates the last 7 calendar days to drive the weekly dashboard bar visualization.
 
 ---
 
-## 5. Visual Identity & Color System
+## 5. Screen Time Distinction & Limitations
 
-The color tokens defined in `tailwind.config.js` represent a grounding, restorative environment:
+### Browser Security Boundary
+Inside standard web browsers, security sandboxing strictly prevents web applications from inspecting other native operating system processes (e.g. knowing whether the user has switched to VS Code, Figma, Slack, or Xcode).
 
-| Token Name | Hex Code | Purpose |
-|---|---|---|
-| `bg-base` | `#FAF9F5` | Calming page background, softer than harsh `#FFFFFF` |
-| `sage-700` | `#305334` | Primary brand accent and active interactive states |
-| `sage-100` | `#E6EFE6` | Soft pill backgrounds and restful highlights |
-| `sand-200` | `#ECE8DF` | Subtle borders, dividers, and card containers |
-| `calm-water` | `#3B82A6` | Hydration metrics and fluid recovery indicators |
-| `calm-ochre` | `#C97D29` | Break reminders and gentle attention cues |
-| `clay-500` | `#C36E4F` | Movement and physical ergonomics notifications |
+### Mindora's Dual-Metric Approach
+To ensure complete transparency and user trust:
+1. **Verified In-App Active Time**: The exact duration the user spent interacting with Mindora, logged down to the second via `BrowserInAppTelemetryProvider`.
+2. **Estimated Workday Screen Time**: A modeled metric combining verified deep work blocks, recorded micro-breaks, in-app active duration, and the user's daily work baseline.
+
+*Sprint 3 & Sprint 4 roadmap will introduce an optional native desktop daemon stub (`IDesktopTelemetryProvider`) to bridge system-wide application tracking when explicitly authorized by the user.*
 
 ---
 
-## 6. Sprint 1 Boundaries & Future Extensibility
+## 6. Privacy & User Control
 
-To maintain a disciplined sprint boundary, Sprint 1 focuses exclusively on front-end architecture, interaction design, and mock state synchronization:
-
-| Capability | Sprint 1 Status | Future Sprint Target |
-|---|---|---|
-| Dashboard & Design System | ✅ Completed | Continuous refinement |
-| Working Focus Session Timer | ✅ Completed | Integration with OS notifications |
-| Interactive Hydration & Habits | ✅ Completed | Bluetooth water bottle / smart sync |
-| Mock Work-Pattern Data | ✅ Completed | Local SQLite / IndexDB persistence |
-| OS Activity Tracking Daemon | ⏹️ Out of scope | Sprint 2 (Work Pattern Engine) |
-| On-Device AI / LLM Integration | ⏹️ Out of scope | Sprint 3 (Adaptive Recommendations) |
-| Backend API & Authentication | ⏹️ Out of scope | Sprint 4 (Multi-device Sync) |
+- **Transparent Status Indicator**: Sticky header displays a live tracking pill (`● Tracking: In-App Active` or `Tracking: Idle`).
+- **Complete Storage Erase**: Users can clear all locally stored IndexedDB data at any time via Settings or the Activity view.
+- **Data Portability**: Users can export their complete telemetry and session archive as a structured JSON file at any time.

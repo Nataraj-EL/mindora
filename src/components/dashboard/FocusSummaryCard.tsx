@@ -112,9 +112,11 @@ export const FocusSummaryCard: React.FC = () => {
       <div className="mt-5 pt-3 border-t border-sand-100 flex items-center justify-between text-xs text-stone-500">
         <span className="flex items-center gap-1">
           <Clock className="w-3.5 h-3.5 text-stone-400" />
-          Avg 25 min Pomodoro
+          Avg {focusSummary.averageSessionLengthMinutes || 25} min focus
         </span>
-        <span className="font-medium text-sage-800">2 sessions remaining</span>
+        <span className="font-medium text-sage-800">
+          {Math.max(focusSummary.targetSessions - focusSummary.completedSessions, 0)} sessions remaining
+        </span>
       </div>
     </Card>
   );

@@ -1,24 +1,25 @@
-import React from 'react';
-import { Monitor, TrendingDown, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Monitor, TrendingDown, AlertCircle, CheckCircle2, Info, Activity } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { Card } from '../common/Card';
 import { ProgressBar } from '../common/ProgressBar';
 import { Badge } from '../common/Badge';
 
 export const ScreenTimeCard: React.FC = () => {
-  const { screenTime } = useWellness();
+  const { screenTime, trackingStatus } = useWellness();
+  const [showExplanation, setShowExplanation] = useState(false);
 
   const totalHours = Math.floor(screenTime.totalMinutes / 60);
   const totalMins = screenTime.totalMinutes % 60;
   const targetHours = Math.floor(screenTime.maxTargetMinutes / 60);
   const targetMins = screenTime.maxTargetMinutes % 60;
 
-  const usagePercent = Math.min(
-    Math.round((screenTime.totalMinutes / screenTime.maxTargetMinutes) * 100),
-    100
+  const inAppMinutes = Math.max(
+    Math.floor(trackingStatus.inAppActiveSeconds / 60),
+    screenTime.inAppActiveMinutes
   );
 
-  const isNearLimit = usagePercent >= 85;
+  const isNearLimit = screenTime.totalMinutes >= screenTime.maxTargetMinutes * 0.85;
   const isContinuousHigh =
     screenTime.activeContinuousMinutes >= screenTime.continuousStrainThresholdMinutes;
 
@@ -32,8 +33,17 @@ export const ScreenTimeCard: React.FC = () => {
               <Monitor className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-stone-900">Today's Screen Time</h3>
-              <p className="text-xs text-stone-500">Active display exposure & apps</p>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-stone-900">Workday Screen Time</h3>
+                <button
+                  onClick={() => setShowExplanation(!showExplanation)}
+                  className="text-stone-400 hover:text-stone-700 cursor-pointer"
+                  title="How screen time is calculated"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <p className="text-xs text-stone-500">Estimated total & verified in-app presence</p>
             </div>
           </div>
           <Badge
@@ -44,6 +54,19 @@ export const ScreenTimeCard: React.FC = () => {
             {isNearLimit ? 'Near Limit' : 'Within Budget'}
           </Badge>
         </div>
+
+        {/* Informative Explanation Banner */}
+        {showExplanation && (
+          <div className="mb-3 p-3 rounded-xl bg-sand-100/80 border border-sand-200/90 text-[11px] text-stone-700 leading-relaxed">
+            <p className="font-semibold text-stone-900 mb-0.5">Tracking Distinction:</p>
+            <p className="mb-1">
+              • <strong>In-App Active Time:</strong> Directly measured presence inside Mindora ({inAppMinutes}m today).
+            </p>
+            <p>
+              • <strong>Workday Estimate:</strong> Modeled total screen exposure combining your completed focus blocks, break intervals, and daily baseline.
+            </p>
+          </div>
+        )}
 
         {/* Big Metric Display */}
         <div className="flex items-baseline justify-between mt-3 mb-1">
@@ -71,38 +94,56 @@ export const ScreenTimeCard: React.FC = () => {
           />
         </div>
 
-        {/* Continuous Session Fatigue Warning */}
-        <div
-          className={`mt-4 p-3 rounded-xl border text-xs flex items-center justify-between ${
-            isContinuousHigh
-              ? 'bg-amber-50/70 border-amber-200 text-amber-900'
-              : 'bg-sand-50/80 border-sand-200/80 text-stone-600'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isContinuousHigh ? 'bg-amber-500 animate-pulse' : 'bg-sage-500'
-              }`}
-            />
-            <span>
-              Continuous Screen Block: <strong>{screenTime.activeContinuousMinutes} mins</strong>
+        {/* Distinct In-App Active Badge & Continuous Strain Status */}
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+          {/* Verified In-App Metric */}
+          <div className="p-2.5 rounded-xl bg-sand-50/80 border border-sand-200/80 flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-stone-500 flex items-center gap-1">
+              <Activity className="w-3 h-3 text-sage-600" />
+              Verified In-App
             </span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-lg font-bold text-stone-900 font-mono">{inAppMinutes}m</span>
+              <span className="text-[10px] text-stone-400">tracked</span>
+            </div>
           </div>
-          <span className="text-[11px] text-stone-500">
-            {isContinuousHigh ? 'Break recommended' : 'Under 50m limit'}
-          </span>
+
+          {/* Continuous Session Alert */}
+          <div
+            className={`p-2.5 rounded-xl border flex flex-col justify-between ${
+              isContinuousHigh
+                ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                : 'bg-sand-50/80 border-sand-200/80 text-stone-700'
+            }`}
+          >
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-stone-500 flex items-center gap-1">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isContinuousHigh ? 'bg-amber-500 animate-pulse' : 'bg-sage-500'
+                }`}
+              />
+              Current Stretch
+            </span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-lg font-bold font-mono">
+                {screenTime.activeContinuousMinutes}m
+              </span>
+              <span className="text-[10px] text-stone-500">
+                {isContinuousHigh ? 'Strain Risk' : '< 50m safe'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Category Breakdown */}
-      <div className="mt-5 pt-4 border-t border-sand-100">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 block mb-2.5">
-          Work Category Breakdown
+      <div className="mt-4 pt-3.5 border-t border-sand-100">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 block mb-2">
+          Workday Distribution
         </span>
 
         {/* Segmented Bar */}
-        <div className="h-2 w-full rounded-full overflow-hidden flex bg-sand-200/60 mb-3">
+        <div className="h-2 w-full rounded-full overflow-hidden flex bg-sand-200/60 mb-2.5">
           {screenTime.categories.map((cat) => (
             <div
               key={cat.category}

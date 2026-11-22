@@ -28,11 +28,13 @@ export const mockUserProfile: UserProfile = {
 };
 
 export const initialScreenTimeData: ScreenTimeData = {
-  totalMinutes: 285, // 4h 45m
+  totalMinutes: 285, // 4h 45m estimated full workday
+  inAppActiveMinutes: 38, // Tracked in-app active Mindora time
   maxTargetMinutes: 390, // 6h 30m
   activeContinuousMinutes: 38,
   continuousStrainThresholdMinutes: 50,
   changeVsYesterdayMinutes: -25, // 25 mins less screen fatigue than yesterday
+  isEstimatedSystemTotal: true,
   categories: [
     {
       category: 'Deep Focus & Code',
