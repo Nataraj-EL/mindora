@@ -1,0 +1,65 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        sage: {
+          50: '#F4F7F4',
+          100: '#E6EFE6',
+          200: '#CDDFCE',
+          300: '#A7C7A9',
+          400: '#7AA97E',
+          500: '#538A58',
+          600: '#3D6B42',
+          700: '#305334',
+          800: '#27422B',
+          900: '#203723',
+          950: '#111E13',
+        },
+        sand: {
+          50: '#FAF9F5',
+          100: '#F5F3EC',
+          200: '#ECE8DF',
+          300: '#DFD8C9',
+          400: '#C2B8A3',
+          500: '#A4977E',
+          600: '#86785F',
+          700: '#675B46',
+          800: '#483F30',
+          900: '#2D271E',
+        },
+        clay: {
+          50: '#FDF7F5',
+          100: '#F9EEE9',
+          200: '#F2DACF',
+          300: '#E7BEAD',
+          400: '#D6947A',
+          500: '#C36E4F',
+          600: '#AA5437',
+          700: '#8A412A',
+          800: '#6F3624',
+          900: '#5A2E20',
+        },
+        calm: {
+          sky: '#E8F1F5',
+          water: '#3B82A6',
+          ochre: '#C97D29',
+          sun: '#F59E0B',
+          stone: '#52525B',
+        },
+      },
+      fontFamily: {
+        sans: [
+          'Inter',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          'sans-serif',
+        ],
+      },
+    },
+  },
+  plugins: [],
+};
