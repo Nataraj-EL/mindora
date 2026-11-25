@@ -12,20 +12,27 @@ import {
   Trash2,
   Download,
   AlertTriangle,
+  Moon,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
+import { Badge } from '../common/Badge';
+import { ReminderCategory } from '../../types/reminders';
 
 export const SettingsView: React.FC = () => {
   const {
     user,
     updateUserGoals,
-    focusTimer,
-    toggleSound,
     clearAllStoredData,
     exportStoredData,
+    notificationSettings,
+    updateNotificationSettings,
+    browserPermission,
+    requestBrowserNotificationPermission,
   } = useWellness();
 
   const [maxScreenHours, setMaxScreenHours] = useState(
@@ -41,7 +48,6 @@ export const SettingsView: React.FC = () => {
     user.dailyGoals.breaksCount.toString()
   );
 
-  const [reminderInterval, setReminderInterval] = useState('45');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [clearedSuccess, setClearedSuccess] = useState(false);
@@ -79,6 +85,14 @@ export const SettingsView: React.FC = () => {
     setTimeout(() => setExportedSuccess(false), 3000);
   };
 
+  const handleToggleCategory = (category: ReminderCategory) => {
+    const updated = {
+      ...notificationSettings.categoryPreferences,
+      [category]: !notificationSettings.categoryPreferences[category],
+    };
+    updateNotificationSettings({ categoryPreferences: updated });
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
@@ -86,10 +100,10 @@ export const SettingsView: React.FC = () => {
         <div className="flex items-start justify-between">
           <div className="space-y-1">
             <h2 className="text-2xl font-bold text-stone-900 tracking-tight">
-              Settings & Workday Rituals
+              Settings & Adaptive Wellness
             </h2>
             <p className="text-sm text-stone-500">
-              Customize daily targets, break cadences, and local storage controls
+              Customize daily targets, intelligent notification pacing, and local storage controls
             </p>
           </div>
           {savedSuccess && (
@@ -141,14 +155,15 @@ export const SettingsView: React.FC = () => {
             <div className="flex justify-between py-1.5">
               <span>Storage Driver</span>
               <span className="font-medium text-emerald-700 flex items-center gap-1">
-                <Database className="w-3 h-3" /> IndexedDB Active
+                <Database className="w-3 h-3" /> IndexedDB v2 Active
               </span>
             </div>
           </div>
         </Card>
 
-        {/* Right Column: Daily Targets, Sensory, and Data Privacy */}
+        {/* Right Column: Daily Targets, Adaptive Notifications, and Privacy */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Daily Goals */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 rounded-xl bg-sage-50 text-sage-700">
@@ -247,7 +262,7 @@ export const SettingsView: React.FC = () => {
             </form>
           </Card>
 
-          {/* Sensory & Notification Preferences */}
+          {/* Adaptive Notification & Scheduling Engine */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
@@ -255,54 +270,218 @@ export const SettingsView: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-stone-900">
-                  Sensory & Adaptive Cadence
+                  Adaptive Notification & Scheduling
                 </h3>
-                <p className="text-xs text-stone-500">Gentle cues and sound feedback</p>
+                <p className="text-xs text-stone-500">
+                  Intelligent pacing based on fatigue telemetry and quiet hours
+                </p>
               </div>
             </div>
 
             <div className="space-y-4 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-sand-50/70 border border-sand-200/60">
+              {/* Browser Notification Permissions */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-sand-50/80 border border-sand-200/70">
                 <div>
-                  <span className="font-semibold text-stone-800 block">
-                    Zen Tibetan Singing Bowl Chime
-                  </span>
-                  <span className="text-stone-500 text-[11px]">
-                    Harmonic 528Hz synthesis upon session and break completion
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-stone-900 block">
+                      Web Browser Notifications
+                    </span>
+                    <Badge
+                      variant={
+                        browserPermission === 'granted'
+                          ? 'success'
+                          : browserPermission === 'denied'
+                          ? 'warning'
+                          : 'sand'
+                      }
+                      size="sm"
+                    >
+                      {browserPermission === 'granted'
+                        ? 'Permitted'
+                        : browserPermission === 'denied'
+                        ? 'Blocked in Browser'
+                        : 'Permission Needed'}
+                    </Badge>
+                  </div>
+                  <span className="text-stone-500 text-[11px] mt-0.5 block">
+                    Receive system alerts even when the browser is unfocused or backgrounded
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={toggleSound}
-                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-                    focusTimer.soundEnabled
-                      ? 'bg-sage-700 text-white'
-                      : 'bg-sand-200 text-stone-600 hover:bg-sand-300'
-                  }`}
-                >
-                  {focusTimer.soundEnabled ? 'Enabled' : 'Muted'}
-                </button>
+
+                {browserPermission !== 'granted' ? (
+                  <button
+                    type="button"
+                    onClick={requestBrowserNotificationPermission}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-sage-700 hover:bg-sage-800 text-white cursor-pointer self-start sm:self-auto transition-colors"
+                  >
+                    Enable Browser Alerts
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateNotificationSettings({
+                        browserNotificationsEnabled: !notificationSettings.browserNotificationsEnabled,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer self-start sm:self-auto ${
+                      notificationSettings.browserNotificationsEnabled
+                        ? 'bg-sage-700 text-white'
+                        : 'bg-sand-200 text-stone-600 hover:bg-sand-300'
+                    }`}
+                  >
+                    {notificationSettings.browserNotificationsEnabled ? 'Active' : 'Disabled'}
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-sand-50/70 border border-sand-200/60">
-                <div>
-                  <span className="font-semibold text-stone-800 block">
-                    Adaptive Break Prompts
-                  </span>
-                  <span className="text-stone-500 text-[11px]">
-                    Automatic reminders after sustained continuous screen stretches
-                  </span>
+              {/* In-App Toasts & Sound */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-sand-50/70 border border-sand-200/60">
+                  <div>
+                    <span className="font-semibold text-stone-800 block">In-App Toasts</span>
+                    <span className="text-stone-500 text-[11px]">
+                      Gentle corner toast alerts
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateNotificationSettings({
+                        inAppToastsEnabled: !notificationSettings.inAppToastsEnabled,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                      notificationSettings.inAppToastsEnabled
+                        ? 'bg-sage-700 text-white'
+                        : 'bg-sand-200 text-stone-600 hover:bg-sand-300'
+                    }`}
+                  >
+                    {notificationSettings.inAppToastsEnabled ? 'On' : 'Off'}
+                  </button>
                 </div>
-                <select
-                  value={reminderInterval}
-                  onChange={(e) => setReminderInterval(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg border border-sand-200 bg-white font-medium text-stone-800"
-                >
-                  <option value="30">Every 30 mins</option>
-                  <option value="45">Every 45 mins (Recommended)</option>
-                  <option value="60">Every 60 mins</option>
-                  <option value="90">Every 90 mins</option>
-                </select>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-sand-50/70 border border-sand-200/60">
+                  <div>
+                    <span className="font-semibold text-stone-800 block">Zen Audio Chime</span>
+                    <span className="text-stone-500 text-[11px]">528Hz harmonic tone</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateNotificationSettings({
+                        soundAlertsEnabled: !notificationSettings.soundAlertsEnabled,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
+                      notificationSettings.soundAlertsEnabled
+                        ? 'bg-sage-700 text-white'
+                        : 'bg-sand-200 text-stone-600 hover:bg-sand-300'
+                    }`}
+                  >
+                    {notificationSettings.soundAlertsEnabled ? (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5" /> On
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5" /> Muted
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quiet Hours Configuration */}
+              <div className="p-3.5 rounded-xl bg-sand-50/70 border border-sand-200/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Moon className="w-4 h-4 text-stone-600" />
+                    <div>
+                      <span className="font-semibold text-stone-800 block">Quiet Hours</span>
+                      <span className="text-stone-500 text-[11px]">
+                        Suppress routine and low-priority alerts during deep focus or meals
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateNotificationSettings({
+                        quietHoursEnabled: !notificationSettings.quietHoursEnabled,
+                      })
+                    }
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                      notificationSettings.quietHoursEnabled
+                        ? 'bg-sage-700 text-white'
+                        : 'bg-sand-200 text-stone-600 hover:bg-sand-300'
+                    }`}
+                  >
+                    {notificationSettings.quietHoursEnabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                </div>
+
+                {notificationSettings.quietHoursEnabled && (
+                  <div className="flex items-center gap-3 pt-2 border-t border-sand-200/60">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-stone-500">From:</span>
+                      <input
+                        type="time"
+                        value={notificationSettings.quietHoursStart}
+                        onChange={(e) =>
+                          updateNotificationSettings({ quietHoursStart: e.target.value })
+                        }
+                        className="px-2 py-1 rounded-lg border border-sand-300 bg-white font-mono text-stone-800 text-xs"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="text-stone-500">Until:</span>
+                      <input
+                        type="time"
+                        value={notificationSettings.quietHoursEnd}
+                        onChange={(e) =>
+                          updateNotificationSettings({ quietHoursEnd: e.target.value })
+                        }
+                        className="px-2 py-1 rounded-lg border border-sand-300 bg-white font-mono text-stone-800 text-xs"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Category Preferences */}
+              <div className="pt-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400 block mb-2">
+                  Enabled Intervention Categories
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: 'hydration', label: 'Hydration' },
+                      { id: 'eye-break', label: 'Eye Care (20-20-20)' },
+                      { id: 'posture', label: 'Posture' },
+                      { id: 'movement', label: 'Movement' },
+                      { id: 'breathing', label: 'Breathing' },
+                      { id: 'rest', label: 'Rest Pauses' },
+                    ] as { id: ReminderCategory; label: string }[]
+                  ).map((cat) => {
+                    const isEnabled = notificationSettings.categoryPreferences[cat.id];
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => handleToggleCategory(cat.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                          isEnabled
+                            ? 'bg-sage-100 text-sage-900 border border-sage-300'
+                            : 'bg-sand-100 text-stone-400 line-through border border-sand-200'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </Card>

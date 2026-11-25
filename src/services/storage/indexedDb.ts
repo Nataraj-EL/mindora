@@ -4,10 +4,10 @@ import {
   HydrationRecord,
   AppUsageRecord,
 } from '../../types/tracking';
-import { MoodEntry } from '../../types';
+import { MoodEntry, AdaptiveReminder, NotificationToast } from '../../types';
 
 const DB_NAME = 'mindora_wellness_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class MindoraStorage {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -67,6 +67,21 @@ class MindoraStorage {
         // General settings / preferences store
         if (!db.objectStoreNames.contains('user_settings')) {
           db.createObjectStore('user_settings', { keyPath: 'key' });
+        }
+
+        // Reminders store
+        if (!db.objectStoreNames.contains('reminders')) {
+          const remStore = db.createObjectStore('reminders', { keyPath: 'id' });
+          remStore.createIndex('by_category', 'category', { unique: false });
+          remStore.createIndex('by_status', 'status', { unique: false });
+          remStore.createIndex('by_dueAt', 'dueAt', { unique: false });
+        }
+
+        // Notification history store
+        if (!db.objectStoreNames.contains('notification_history')) {
+          const notifStore = db.createObjectStore('notification_history', { keyPath: 'id' });
+          notifStore.createIndex('by_timestamp', 'timestamp', { unique: false });
+          notifStore.createIndex('by_category', 'category', { unique: false });
         }
       };
 
@@ -363,6 +378,83 @@ class MindoraStorage {
     }
   }
 
+  // --- Reminders & Notifications ---
+
+  async saveReminder(reminder: AdaptiveReminder): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('reminders', 'readwrite');
+        const store = tx.objectStore('reminders');
+        const req = store.put(reminder);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('reminders') as AdaptiveReminder[]) || [];
+      const idx = list.findIndex((r) => r.id === reminder.id);
+      if (idx >= 0) list[idx] = reminder;
+      else list.unshift(reminder);
+      this.memoryFallback.set('reminders', list);
+    }
+  }
+
+  async getReminders(): Promise<AdaptiveReminder[]> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('reminders', 'readonly');
+        const store = tx.objectStore('reminders');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const results = (req.result as AdaptiveReminder[]) || [];
+          resolve(results);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      return (this.memoryFallback.get('reminders') as AdaptiveReminder[]) || [];
+    }
+  }
+
+  async saveNotificationToast(toast: NotificationToast): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('notification_history', 'readwrite');
+        const store = tx.objectStore('notification_history');
+        const req = store.put(toast);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('notification_history') as NotificationToast[]) || [];
+      list.unshift(toast);
+      this.memoryFallback.set('notification_history', list);
+    }
+  }
+
+  async getNotificationHistory(limit = 50): Promise<NotificationToast[]> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('notification_history', 'readonly');
+        const store = tx.objectStore('notification_history');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          let results = (req.result as NotificationToast[]) || [];
+          results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          if (limit > 0) results = results.slice(0, limit);
+          resolve(results);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('notification_history') as NotificationToast[]) || [];
+      return list.slice(0, limit);
+    }
+  }
+
   // --- Seed check & Clear ---
 
   async isDataSeeded(): Promise<boolean> {
@@ -408,6 +500,8 @@ class MindoraStorage {
         'hydration_logs',
         'app_usage',
         'mood_entries',
+        'reminders',
+        'notification_history',
       ];
       return new Promise((resolve, reject) => {
         const tx = db.transaction(storeNames, 'readwrite');

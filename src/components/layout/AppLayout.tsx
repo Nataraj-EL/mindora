@@ -3,6 +3,8 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
 import { FocusTimerModal } from '../dashboard/FocusTimerModal';
+import { ToastContainer } from '../common/ToastContainer';
+import { useWellness } from '../../context/WellnessContext';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,6 +12,7 @@ interface AppLayoutProps {
 
 export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toasts, dismissToast, completeToast, snoozeToast } = useWellness();
 
   return (
     <div className="min-h-screen flex bg-[#FAF9F5] text-stone-800">
@@ -32,6 +35,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       {/* Working Focus Session Modal */}
       <FocusTimerModal />
+
+      {/* Live In-App Toast Notifications */}
+      <ToastContainer
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onComplete={completeToast}
+        onSnooze={snoozeToast}
+      />
     </div>
   );
 };

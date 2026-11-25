@@ -84,17 +84,7 @@ export interface WellnessScoreData {
   aiObservation: string;
 }
 
-export type ReminderCategory = 'hydration' | 'eye-break' | 'posture' | 'movement' | 'breathing';
-
-export interface ReminderItem {
-  id: string;
-  title: string;
-  description: string;
-  dueTime: string;
-  category: ReminderCategory;
-  urgency: 'routine' | 'due-soon' | 'overdue';
-  isCompleted: boolean;
-}
+export * from './reminders';
 
 export type ActivityCategory = 'focus' | 'break' | 'hydration' | 'movement' | 'wellbeing';
 

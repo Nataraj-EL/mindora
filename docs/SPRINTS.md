@@ -23,51 +23,55 @@
 - [x] **Client-Side Persistent Storage (IndexedDB)**:
   - Engineered zero-dependency `MindoraStorage` on native IndexedDB (`mindora_wellness_db` v1).
   - Implemented 6 structured Object Stores: `activities`, `focus_sessions`, `hydration_logs`, `app_usage`, `mood_entries`, and `user_settings`.
-  - Added indexed querying by `dateKey` (`YYYY-MM-DD`), `category`, and timestamps.
-  - Safe automatic seeding of initial demo dataset on first run without overwriting future user data.
-  - Complete state restoration across page reloads and browser restarts.
-
+  - Safe automatic seeding of initial baseline history with complete restoration across page reloads.
 - [x] **Decoupled Telemetry Pipeline**:
-  - Defined `ITelemetryProvider` and `TelemetryMetadata` contracts in `telemetryInterfaces.ts`.
-  - Implemented `BrowserInAppTelemetryProvider` to monitor tab visibility (`document.visibilityState`) and presence/idle states.
-  - Prepared `IDesktopTelemetryProvider` interface stub for future native desktop daemon integration.
+  - Defined `ITelemetryProvider` contract and built `BrowserInAppTelemetryProvider` to monitor tab visibility and presence/idle states.
+  - Prepared `IDesktopTelemetryProvider` interface stub for future desktop daemons.
   - Created reusable tracking hooks: `useAppActiveTimeTracker` and `useWorkPatternTracker`.
-
-- [x] **Work Pattern Analytics (`WorkPatternService`)**:
-  - Live calculation of daily and weekly focus durations directly from completed session records.
-  - Real-time tracking of average focus session length (`totalFocusMinutes / completedSessions`).
-  - Analysis of work-to-break rhythm ratios (e.g., `4.2:1`).
+- [x] **Work Pattern Analytics**:
+  - Live calculation of daily and weekly focus durations, completed session counts, and average session lengths.
   - Dual screen-time metrics: Verified In-App Active Time vs. Estimated Workday Screen Time.
-  - Automatic detection of prolonged continuous focus sessions ($\ge 50$ min threshold warning).
-
-- [x] **Enhanced Activity Dashboard**:
-  - Added date-based filtering (**Today**, **Yesterday**, **Past 7 Days**, **All Time**).
-  - Real-time search query filtering over event titles and descriptions.
-  - Dynamic 7-day weekly activity visualization populated from real IndexedDB day aggregates.
-  - Real-time in-app presence counter and session time in dashboard headers and screen time cards.
-  - Thoughtfully designed empty states for empty search queries or dates without activity.
-
-- [x] **Privacy & User Data Sovereignty**:
-  - Live tracking status pill in header (`● Tracking: In-App Active` / `Tracking: Idle`).
-  - Guaranteed privacy invariant: strictly **zero keystroke collection**, zero screenshot capture, and zero external transmission.
-  - User controls to **Clear Stored Activity Data** with confirmation modal in Settings and Activity views.
-  - User controls to **Export JSON Archive** for complete data portability.
-
-- [x] **Quality Assurance & Build**:
-  - Clean TypeScript compilation with strict options (`npm run type-check`).
-  - Production build verification with Vite (`npm run build`).
+  - Automatic detection of prolonged continuous focus sessions ($\ge 50$ min warning).
+- [x] **Activity Dashboard Enhancements & Privacy**:
+  - Date-based filtering (**Today**, **Yesterday**, **Past 7 Days**, **All Time**) and instant search.
+  - Transparent tracking pill (`● Tracking: In-App Active` / `Tracking: Idle`).
+  - User controls to **Clear Stored Activity Data** and **Export JSON Archive**.
 
 ---
 
-## 🔮 Sprint 3: Adaptive AI Recommendation Engine (Upcoming)
+## 🏁 Sprint 3: Adaptive Wellness Reminder Engine & Intelligent Interventions (Completed)
 
-**Objective**: Integrate on-device or privacy-preserving LLM capabilities to deliver hyper-personalized wellness advice, adaptive reminder pacing, and reflective check-in debriefs.
+**Objective**: Build an adaptive wellness reminder engine that analyses actual work patterns and delivers timely, personalized, and explainable wellness interventions.
 
-### Planned Scope:
-- **Circadian Modeling Engine**: Algorithmic detection of personal energy peaks and cognitive fatigue windows based on logged multi-day patterns.
-- **Adaptive Break Scheduling**: Automatically shifts reminder intervals dynamically based on focus block intensity (e.g. shortening focus intervals after high continuous strain).
-- **Mindora Conversational Reflection**: On-device natural language companion for mindful end-of-day retrospectives.
-- **Biometric Connectors**: Optional local sync with health wearables (HRV and sleep readiness scores).
+### Deliverables & Achievements
+- [x] **Intelligent Reminder Engine (`WellnessReminderService`)**:
+  - Engineered modular, UI-independent `WellnessReminderService`.
+  - Comprehensive category coverage: `hydration`, `eye-break` (20-20-20 rule), `movement`, `posture`, `breathing`, and `rest`.
+  - Generated reminders using actual tracked metrics: continuous screen focus duration, hydration deficit, and time since last pause.
+  - Prioritized classification: `routine`, `medium`, `high`, `critical`.
+- [x] **Adaptive Scheduling & Anti-Spam Throttling**:
+  - Implemented category cooldowns (15 min per category) and global cooldowns (5 min between any alerts).
+  - Duplicate notification suppression (prevents duplicate pending/snoozed alerts).
+  - Inactivity and background suppression: pauses alerts when tab is hidden or user is idle $> 60$s.
+  - Fully configurable **Quiet Hours** with boundary wrap-around (e.g. lunch hour `12:30` - `13:30` or evening hours).
+  - Rescheduling workflows for **Snooze** (+15m, +30m) and **Dismiss**.
+- [x] **Personalized Recommendations with Explicit "Why" Explanations**:
+  - Replaced generic suggestions with evidence-based interventions dynamically ranked by fatigue score.
+  - Explicit explanation badge on every card: *"Why this is recommended"* (e.g. *"Critical: You have been looking at screens for 52 uninterrupted minutes without looking away"*).
+  - Expandable actionable guidance with step-by-step physical and vagal relief instructions.
+- [x] **Multi-Channel Notification System**:
+  - Built actionable in-app [`ToastContainer`](file:///home/nataraj/Downloads/Projects/mindora/src/components/common/ToastContainer.tsx) with calm styling and immediate action buttons (`Mark Done`, `Snooze 15m`, `Dismiss`).
+  - Integrated native browser Web Notifications API (`Notification.requestPermission()`, `new Notification()`) with explicit permission toggle.
+  - Enhanced Header with interactive Due Reminders drawer and notification badge.
+  - Upgraded IndexedDB to `v2` with `reminders` and `notification_history` stores.
+- [x] **Wellness Dashboard Integration & Adherence Analytics**:
+  - Updated `RemindersCard` with **Due**, **Upcoming**, and **Done** tabs.
+  - Added live intervention compliance statistics: compliance rate adherence %, total completed vs. snoozed vs. dismissed, and top compliant category.
+  - Synchronized completion: completing interventions updates daily scores, logs to activity timeline, and auto-increments hydration.
+- [x] **Quality Assurance & Verification**:
+  - Automated test script verifying generation thresholds, anti-spam cooldowns, snooze/completion states, quiet hours, and recommendations ranking.
+  - Clean TypeScript compilation with strict options (`npm run type-check`).
+  - Production build verification with Vite (`npm run build`).
 
 ---
 
@@ -77,6 +81,17 @@
 
 ### Planned Scope:
 - **Native Desktop Agent (Electron/Rust)**: Implements `IDesktopTelemetryProvider` to track system-wide foreground application names (e.g. VS Code, Figma, Slack) without browser sandbox limits.
-- **Zero-Knowledge Sync**: End-to-end encrypted backup between laptop and mobile.
+- **Zero-Knowledge Sync**: End-to-end encrypted backup between workstation and mobile devices.
 - **Focus Shielding**: Automated status sync to communication apps ("Elena is in a Deep Focus block until 11:30 AM").
 - **Team Boundary Health**: Anonymous team-level indicators to prevent meeting overload.
+
+---
+
+## 🔮 Sprint 5: Conversational AI & Circadian Chronotyping (Upcoming)
+
+**Objective**: Integrate on-device or privacy-preserving LLM capabilities to deliver hyper-personalized wellness advice and reflective check-in debriefs.
+
+### Planned Scope:
+- **Circadian Modeling Engine**: Algorithmic detection of personal chronotypes (lark vs night owl) and cognitive peak windows.
+- **Mindora Conversational Reflection**: On-device natural language companion for mindful end-of-day retrospectives.
+- **Biometric Connectors**: Optional local sync with health wearables (HRV and sleep readiness scores).

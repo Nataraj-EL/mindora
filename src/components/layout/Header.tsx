@@ -7,9 +7,15 @@ import {
   Clock,
   Shield,
   Check,
+  Eye,
+  Activity,
+  Wind,
+  Coffee,
+  Sparkles,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { Button } from '../common/Button';
+import { ReminderCategory } from '../../types/reminders';
 
 interface HeaderProps {
   onMobileMenuToggle: () => void;
@@ -23,11 +29,13 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
     startTimer,
     logGlassOfWater,
     reminders,
-    setActiveTab,
+    completeReminder,
+    snoozeReminder,
     trackingStatus,
   } = useWellness();
 
   const [showPrivacyTooltip, setShowPrivacyTooltip] = useState(false);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
 
   const titles: Record<string, { title: string; subtitle: string }> = {
     dashboard: {
@@ -53,13 +61,36 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
   };
 
   const currentMeta = titles[activeTab] || titles.dashboard;
-  const pendingRemindersCount = reminders.filter((r) => !r.isCompleted).length;
+
+  const dueReminders = reminders.filter(
+    (r) => r.status === 'due' || (!r.status && !r.isCompleted)
+  );
+
+  const pendingRemindersCount = dueReminders.length;
 
   const todayFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   });
+
+  const getCategoryIcon = (category: ReminderCategory) => {
+    switch (category) {
+      case 'eye-break':
+        return <Eye className="w-3.5 h-3.5 text-amber-600" />;
+      case 'posture':
+        return <Activity className="w-3.5 h-3.5 text-emerald-600" />;
+      case 'hydration':
+        return <Droplets className="w-3.5 h-3.5 text-calm-water" />;
+      case 'movement':
+        return <Activity className="w-3.5 h-3.5 text-clay-600" />;
+      case 'breathing':
+        return <Wind className="w-3.5 h-3.5 text-teal-600" />;
+      case 'rest':
+      default:
+        return <Coffee className="w-3.5 h-3.5 text-amber-600" />;
+    }
+  };
 
   return (
     <header className="sticky top-0 z-30 bg-[#FAF9F5]/95 backdrop-blur-xs border-b border-sand-200/80 px-4 sm:px-6 lg:px-8 py-3.5 transition-all">
@@ -172,17 +203,85 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
             <span className="sm:hidden">{focusTimer.isRunning ? 'Focus' : 'Start'}</span>
           </Button>
 
-          {/* Reminders Alert */}
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            title={`${pendingRemindersCount} pending wellness reminders`}
-            className="relative p-2 rounded-xl text-stone-500 hover:text-stone-800 hover:bg-sand-100 transition-colors cursor-pointer"
-          >
-            <Bell className="w-5 h-5" />
-            {pendingRemindersCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-[#FAF9F5]" />
+          {/* Reminders Alert Bell with Quick Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+              title={`${pendingRemindersCount} pending wellness reminders`}
+              className="relative p-2 rounded-xl text-stone-500 hover:text-stone-800 hover:bg-sand-100 transition-colors cursor-pointer"
+            >
+              <Bell className="w-5 h-5" />
+              {pendingRemindersCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-[#FAF9F5]" />
+              )}
+            </button>
+
+            {/* Dropdown Drawer */}
+            {showNotifDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-80 p-3.5 rounded-2xl bg-white border border-sand-200 shadow-xl text-xs z-50 animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between pb-2 border-b border-sand-100 mb-2">
+                  <span className="font-bold text-stone-900 text-xs">Due Reminders ({dueReminders.length})</span>
+                  <button
+                    onClick={() => setShowNotifDropdown(false)}
+                    className="text-[11px] text-stone-400 hover:text-stone-700"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {dueReminders.length === 0 ? (
+                  <div className="py-4 text-center text-[11px] text-stone-500">
+                    <Sparkles className="w-5 h-5 text-sage-600 mx-auto mb-1" />
+                    All caught up on wellness breaks!
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {dueReminders.map((rem) => (
+                      <div
+                        key={rem.id}
+                        className="p-2.5 rounded-xl bg-sand-50/70 border border-sand-200/70 flex flex-col gap-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {getCategoryIcon(rem.category)}
+                            <span className="font-semibold text-stone-900 text-xs truncate">
+                              {rem.title}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-stone-400 font-mono shrink-0">
+                            {rem.dueTime || 'Due'}
+                          </span>
+                        </div>
+                        {rem.triggerReason && (
+                          <span className="text-[10px] text-stone-500 leading-tight">
+                            {rem.triggerReason}
+                          </span>
+                        )}
+                        <div className="flex justify-end gap-1.5 pt-1">
+                          <button
+                            onClick={() => {
+                              snoozeReminder(rem.id, 15);
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] text-stone-500 hover:bg-sand-200"
+                          >
+                            Snooze
+                          </button>
+                          <button
+                            onClick={() => {
+                              completeReminder(rem.id);
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] bg-sage-700 text-white font-semibold hover:bg-sage-800"
+                          >
+                            Complete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
         </div>
       </div>
     </header>

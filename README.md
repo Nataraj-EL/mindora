@@ -42,17 +42,34 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
   - One-click **Clear Stored Activity Data** with confirmation modal in Settings and Activity views.
   - Full **Export JSON Archive** for complete user data portability.
 
+### Sprint 3: Adaptive Wellness Reminder Engine (Completed)
+- **Modular Wellness Reminder Service**: Fully decoupled `WellnessReminderService` supporting hydration, eye-care (20-20-20), movement, posture, breathing, and rest reminders.
+- **Intelligent Evaluation & Throttling**:
+  - Continuous focus duration, session strain, inactivity, and hydration deficit tracking.
+  - Multi-tier anti-spam throttling: 15-minute category cooldowns, 5-minute global cooldown, and 1-intervention limit per evaluation cycle.
+  - Smart Quiet Hours enforcement with wrap-around midnight support (e.g., 21:00 to 07:00).
+- **Personalized & Explainable Interventions**:
+  - Contextual recommendations with explicit "Why this is recommended" explanations (e.g. continuous focus strain, hydration target deficit).
+  - Step-by-step actionable instructions and estimated completion times.
+- **Dual Notification System**:
+  - Native browser Web Notifications API integration with explicit user permission controls.
+  - Non-intrusive floating in-app toast stack with Snooze (15m), Dismiss, and Complete actions.
+  - Interactive header notification center bell with live unread badge and quick actions.
+- **IndexedDB v2 Persistence**: Added `reminders` and `notification_history` object stores to persist reminder lifecycle states, snooze timers, and compliance history across refreshes.
+- **Effectiveness & Compliance Metrics**: Live statistics widget tracking completion rates, snooze frequencies, and total wellness actions completed.
+
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
 - **Core Framework**: React 18 + TypeScript (Strict Type Safety)
-- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v1) with zero third-party bundle overhead
+- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v2) with zero third-party bundle overhead
 - **Styling**: Tailwind CSS with custom calming wellness theme tokens
 - **Build Tool**: Vite 6 (ultra-fast HMR and optimized production bundles)
 - **Icons**: Lucide React
 - **Audio Synthesis**: Native Web Audio API (528Hz harmonic oscillator)
 - **Telemetry Engine**: Modular `WorkPatternService` + `BrowserInAppTelemetryProvider` decoupled from presentation layer
+- **Adaptive Reminder Engine**: Decoupled `WellnessReminderService` + Web Notifications API + in-app toast stack
 
 ---
 
@@ -107,20 +124,22 @@ mindora/
 │   └── SPRINTS.md                # Sprint roadmaps and changelogs
 ├── src/
 │   ├── components/
-│   │   ├── common/               # Atomic UI components (Badge, Button, Card, CircularProgress, Modal, ProgressBar)
-│   │   ├── layout/               # Header, Sidebar, MobileNav, AppLayout
-│   │   ├── dashboard/            # WelcomeSection, ScreenTimeCard, FocusSummaryCard, FocusTimerModal, etc.
+│   │   ├── common/               # Atomic UI components (Badge, Button, Card, ToastContainer, etc.)
+│   │   ├── layout/               # Header (with notification center), Sidebar, MobileNav, AppLayout
+│   │   ├── dashboard/            # RemindersCard, WellnessActionsCard, ScreenTimeCard, FocusSummaryCard, etc.
 │   │   └── views/                # DashboardView, MyWellnessView, ActivityView, InsightsView, SettingsView
 │   ├── context/
-│   │   └── WellnessContext.tsx   # Central state, storage hydration, and analytics synchronization
+│   │   └── WellnessContext.tsx   # Central state, storage hydration, reminder loop & analytics synchronization
 │   ├── data/
 │   │   └── mockData.ts           # Initial baseline and seeding dataset
 │   ├── hooks/
 │   │   ├── useAppActiveTimeTracker.ts  # Presence heartbeat and in-app time tracker
 │   │   └── useWorkPatternTracker.ts    # Reusable analytics and logging hook
 │   ├── services/
+│   │   ├── reminders/
+│   │   │   └── wellnessReminderService.ts # Adaptive reminders, anti-spam throttling, quiet hours & recommendations
 │   │   ├── storage/
-│   │   │   └── indexedDb.ts      # Type-safe native IndexedDB storage engine
+│   │   │   └── indexedDb.ts      # Type-safe native IndexedDB storage engine (v2 with reminders & history)
 │   │   └── tracking/
 │   │       ├── telemetryInterfaces.ts  # ITelemetryProvider and BrowserInAppTelemetryProvider
 │   │       └── workPatternService.ts   # WorkPatternService analytics and event engine
@@ -128,6 +147,7 @@ mindora/
 │   │   └── index.css             # Tailwind base directives and calm styling
 │   ├── types/
 │   │   ├── index.ts              # Core domain models
+│   │   ├── reminders.ts          # Adaptive reminder, notification toast, effectiveness & recommendation types
 │   │   └── tracking.ts           # ActivityEvent, FocusSessionRecord, Analytics, and Telemetry types
 │   ├── App.tsx                   # Main view router
 │   └── main.tsx                  # Application entry point

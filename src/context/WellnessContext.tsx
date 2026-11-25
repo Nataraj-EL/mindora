@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import {
   NavigationTab,
   UserProfile,
   ScreenTimeData,
   FocusSessionSummary,
   WellnessScoreData,
-  ReminderItem,
   ActivityTimelineItem,
   DayActivityData,
   RecommendedWellnessAction,
@@ -16,6 +15,13 @@ import {
   HydrationLog,
   ActivityCategory,
 } from '../types';
+import {
+  AdaptiveReminder,
+  NotificationToast,
+  NotificationSettings,
+  ContextualWellnessRecommendation,
+  ReminderEffectivenessStats,
+} from '../types/reminders';
 import {
   ActivityEvent,
   FocusSessionRecord,
@@ -36,6 +42,10 @@ import {
 } from '../data/mockData';
 import { storage } from '../services/storage/indexedDb';
 import { workPatternService, getDateKey } from '../services/tracking/workPatternService';
+import {
+  wellnessReminderService,
+  DEFAULT_NOTIFICATION_SETTINGS,
+} from '../services/reminders/wellnessReminderService';
 import { useAppActiveTimeTracker } from '../hooks/useAppActiveTimeTracker';
 
 interface TrackingStateInfo {
@@ -82,11 +92,31 @@ interface WellnessContextType {
   logGlassOfWater: () => void;
   removeGlassOfWater: () => void;
 
-  // Reminders
-  reminders: ReminderItem[];
-  completeReminder: (id: string) => void;
-  snoozeReminder: (id: string) => void;
-  dismissReminder: (id: string) => void;
+  // Adaptive Reminders
+  reminders: AdaptiveReminder[];
+  completeReminder: (id: string) => Promise<void>;
+  snoozeReminder: (id: string, snoozeMinutes?: number) => Promise<void>;
+  dismissReminder: (id: string) => Promise<void>;
+
+  // In-App Toast Notifications
+  toasts: NotificationToast[];
+  dismissToast: (id: string) => void;
+  completeToast: (toast: NotificationToast) => Promise<void>;
+  snoozeToast: (toast: NotificationToast, snoozeMinutes?: number) => Promise<void>;
+
+  // Notification & Scheduling Settings
+  notificationSettings: NotificationSettings;
+  updateNotificationSettings: (settings: Partial<NotificationSettings>) => Promise<void>;
+  browserPermission: NotificationPermission | 'unsupported';
+  requestBrowserNotificationPermission: () => Promise<boolean>;
+
+  // Reminder Effectiveness Statistics
+  reminderStats: ReminderEffectivenessStats;
+  refreshReminderStats: () => Promise<void>;
+
+  // Contextual Recommendations (with explicit "Why" explanations)
+  contextualRecommendations: ContextualWellnessRecommendation[];
+  toggleContextualRecommendation: (id: string) => Promise<void>;
 
   // Activity Timeline & Filtering
   timeline: ActivityTimelineItem[];
@@ -103,7 +133,7 @@ interface WellnessContextType {
   weeklyMetric: 'screenTime' | 'focus' | 'wellness';
   setWeeklyMetric: (metric: 'screenTime' | 'focus' | 'wellness') => void;
 
-  // Recommended Actions
+  // Recommended Actions (Sprint 1 backward compatible)
   recommendedActions: RecommendedWellnessAction[];
   toggleActionCompletion: (id: string) => void;
 
@@ -167,7 +197,29 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [focusSummary, setFocusSummary] = useState<FocusSessionSummary>(initialFocusSummary);
 
   // Reminders state
-  const [reminders, setReminders] = useState<ReminderItem[]>(initialReminders);
+  const [reminders, setReminders] = useState<AdaptiveReminder[]>(initialReminders);
+
+  // In-App Toast state
+  const [toasts, setToasts] = useState<NotificationToast[]>([]);
+
+  // Notification Settings & Permissions
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
+    DEFAULT_NOTIFICATION_SETTINGS
+  );
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | 'unsupported'>(
+    wellnessReminderService.getBrowserPermissionStatus()
+  );
+
+  // Reminder Effectiveness Stats
+  const [reminderStats, setReminderStats] = useState<ReminderEffectivenessStats>({
+    totalGenerated: 12,
+    totalCompleted: 9,
+    totalSnoozed: 4,
+    totalDismissed: 2,
+    complianceRate: 82,
+    mostCompliantCategory: 'Hydration & Eye Care',
+    averageResponseTimeSeconds: 38,
+  });
 
   // Hydration state
   const [hydration, setHydration] = useState<HydrationLog>({
@@ -186,7 +238,12 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [weeklyActivity, setWeeklyActivity] = useState<DayActivityData[]>(weeklyActivityData);
   const [weeklyMetric, setWeeklyMetric] = useState<'screenTime' | 'focus' | 'wellness'>('focus');
 
-  // Recommended actions
+  // Contextual Recommendations (with explicit "Why" reasoning)
+  const [contextualRecommendations, setContextualRecommendations] = useState<
+    ContextualWellnessRecommendation[]
+  >([]);
+
+  // Recommended actions (Sprint 1 fallback)
   const [recommendedActions, setRecommendedActions] = useState<RecommendedWellnessAction[]>(
     initialWellnessActions
   );
@@ -210,6 +267,22 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
     activeTaskName: 'Deep Flow & Mindful Design',
   });
 
+  const remindersRef = useRef(reminders);
+  remindersRef.current = reminders;
+
+  const notificationSettingsRef = useRef(notificationSettings);
+  notificationSettingsRef.current = notificationSettings;
+
+  // Refresh reminder statistics from storage
+  const refreshReminderStats = useCallback(async () => {
+    try {
+      const stats = await wellnessReminderService.getEffectivenessStats();
+      setReminderStats(stats);
+    } catch {
+      // Graceful fallback
+    }
+  }, []);
+
   // Compute and refresh daily/weekly analytics from real IndexedDB storage
   const refreshAnalytics = useCallback(async () => {
     try {
@@ -221,10 +294,16 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
       );
       const storedHydrations = await storage.getHydrationLogs(todayKey);
       const storedMoods = await storage.getMoodEntries();
+      const storedReminders = await storage.getReminders();
 
       // Update timeline
       if (storedActivities.length > 0) {
         setTimeline(storedActivities);
+      }
+
+      // Update reminders from storage
+      if (storedReminders.length > 0) {
+        setReminders(storedReminders);
       }
 
       // Update focus summary from actual database records
@@ -278,10 +357,28 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
           activeContinuousMinutes: continuousMinutes,
         };
       });
+
+      // Update contextual recommendations
+      const recs = wellnessReminderService.generateContextualRecommendations({
+        continuousActiveMinutes: Math.round(trackingStatus.continuousActiveSeconds / 60),
+        hydrationCount: storedHydrations.length || 5,
+        targetHydration: user.dailyGoals.hydrationGlasses,
+        completedFocusSessions: analytics.todayFocusSessionsCount || 4,
+      });
+      setContextualRecommendations(recs);
+
+      await refreshReminderStats();
     } catch {
       // Graceful fallback
     }
-  }, [timelineDateFilter, timelineCategoryFilter, trackingStatus.inAppActiveSeconds, trackingStatus.continuousActiveSeconds]);
+  }, [
+    timelineDateFilter,
+    timelineCategoryFilter,
+    trackingStatus.inAppActiveSeconds,
+    trackingStatus.continuousActiveSeconds,
+    user.dailyGoals.hydrationGlasses,
+    refreshReminderStats,
+  ]);
 
   // Initial Storage Hydration & Seeding
   useEffect(() => {
@@ -361,9 +458,14 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
             initialHydrations,
             initialMoods
           );
+
+          // Seed initial reminders into reminders store
+          for (const rem of initialReminders) {
+            await storage.saveReminder(rem);
+          }
         }
 
-        // Restore custom user settings if present
+        // Restore custom user settings & notification settings if present
         const savedGoals = await storage.getSetting<UserProfile['dailyGoals']>('user_goals');
         if (savedGoals) {
           setUser((prev) => ({
@@ -373,6 +475,11 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
               ...savedGoals,
             },
           }));
+        }
+
+        const savedNotifSettings = await storage.getSetting<NotificationSettings>('notification_settings');
+        if (savedNotifSettings) {
+          setNotificationSettings(savedNotifSettings);
         }
 
         await refreshAnalytics();
@@ -385,17 +492,150 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
     initializeStorage();
   }, [refreshAnalytics]);
 
-  // Re-run filter when category or date filter changes
+  // Periodic Adaptive Reminder Evaluation Loop (Runs every 15 seconds)
   useEffect(() => {
-    if (isStorageInitialized) {
-      workPatternService
-        .getFilteredActivities(timelineDateFilter, timelineCategoryFilter)
-        .then((items) => {
-          setTimeline(items);
-        })
-        .catch(() => {});
+    if (!isStorageInitialized) return;
+
+    const evaluationInterval = setInterval(async () => {
+      try {
+        const continuousMinutes = Math.floor(trackingStatus.continuousActiveSeconds / 60);
+        const inAppMinutes = Math.floor(trackingStatus.inAppActiveSeconds / 60);
+
+        const { newReminders, toastsToTrigger } = await wellnessReminderService.evaluateAdaptiveReminders({
+          continuousActiveMinutes: continuousMinutes,
+          inAppActiveMinutes: inAppMinutes,
+          isTimerRunning: focusTimer.isRunning,
+          isIdle: trackingStatus.isIdle,
+          isVisible: trackingStatus.isVisible,
+          hydrationCount: hydration.currentGlasses,
+          targetHydration: user.dailyGoals.hydrationGlasses,
+          settings: notificationSettingsRef.current,
+          existingReminders: remindersRef.current,
+        });
+
+        if (newReminders.length > 0) {
+          setReminders((prev) => [...newReminders, ...prev]);
+
+          // Play gentle chime if sound enabled
+          if (notificationSettingsRef.current.soundAlertsEnabled) {
+            playCalmChime();
+          }
+        }
+
+        if (toastsToTrigger.length > 0 && notificationSettingsRef.current.inAppToastsEnabled) {
+          setToasts((prev) => [...toastsToTrigger, ...prev].slice(0, 4)); // max 4 toasts on screen
+        }
+      } catch {
+        // Non-blocking reminder evaluation
+      }
+    }, 15000);
+
+    return () => clearInterval(evaluationInterval);
+  }, [
+    isStorageInitialized,
+    trackingStatus.continuousActiveSeconds,
+    trackingStatus.inAppActiveSeconds,
+    trackingStatus.isIdle,
+    trackingStatus.isVisible,
+    focusTimer.isRunning,
+    hydration.currentGlasses,
+    user.dailyGoals.hydrationGlasses,
+  ]);
+
+  // Update notification settings
+  const updateNotificationSettings = async (settings: Partial<NotificationSettings>) => {
+    const updated = {
+      ...notificationSettings,
+      ...settings,
+    };
+    setNotificationSettings(updated);
+    await storage.saveSetting('notification_settings', updated);
+  };
+
+  // Request browser notification permission
+  const requestBrowserNotificationPermission = async (): Promise<boolean> => {
+    const granted = await wellnessReminderService.requestBrowserNotificationPermission();
+    setBrowserPermission(granted ? 'granted' : 'denied');
+    if (granted) {
+      await updateNotificationSettings({ browserNotificationsEnabled: true });
     }
-  }, [timelineDateFilter, timelineCategoryFilter, isStorageInitialized]);
+    return granted;
+  };
+
+  // Toast actions
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const completeToast = async (toast: NotificationToast) => {
+    dismissToast(toast.id);
+    if (toast.reminderId) {
+      await completeReminder(toast.reminderId);
+    }
+  };
+
+  const snoozeToast = async (toast: NotificationToast, snoozeMinutes = 15) => {
+    dismissToast(toast.id);
+    if (toast.reminderId) {
+      await snoozeReminder(toast.reminderId, snoozeMinutes);
+    }
+  };
+
+  // Reminders management
+  const completeReminder = async (id: string) => {
+    const { updatedReminders } = await wellnessReminderService.completeReminder(id, reminders);
+    setReminders(updatedReminders);
+
+    // If it was a hydration reminder, increment hydration count in state
+    const completed = updatedReminders.find((r) => r.id === id);
+    if (completed?.category === 'hydration') {
+      const now = new Date();
+      setHydration((prev) => ({
+        ...prev,
+        currentGlasses: Math.min(prev.currentGlasses + 1, 16),
+        lastLoggedTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      }));
+    }
+
+    await refreshAnalytics();
+    recalculateWellnessScore();
+  };
+
+  const snoozeReminder = async (id: string, snoozeMinutes = 15) => {
+    const updated = await wellnessReminderService.snoozeReminder(id, snoozeMinutes, reminders);
+    setReminders(updated);
+    await refreshAnalytics();
+  };
+
+  const dismissReminder = async (id: string) => {
+    const updated = await wellnessReminderService.dismissReminder(id, reminders);
+    setReminders(updated);
+    await refreshAnalytics();
+  };
+
+  // Contextual Recommendations toggle
+  const toggleContextualRecommendation = async (id: string) => {
+    setContextualRecommendations((prev) =>
+      prev.map((rec) => {
+        if (rec.id === id) {
+          const nextState = !rec.isCompleted;
+          if (nextState) {
+            workPatternService.recordActivity({
+              type: rec.category === 'hydration' ? 'hydration' : 'break',
+              category: rec.category === 'hydration' ? 'hydration' : rec.category === 'movement' ? 'movement' : 'break',
+              title: `Completed: ${rec.title}`,
+              description: `${rec.instruction} (Trigger: ${rec.reason})`,
+              impact: 'restorative',
+              durationMinutes: parseInt(rec.timeEstimate, 10) || 2,
+            }).catch(() => {});
+          }
+          return { ...rec, isCompleted: nextState };
+        }
+        return rec;
+      })
+    );
+    recalculateWellnessScore();
+  };
 
   // Sync real-time in-app screen time into state
   useEffect(() => {
@@ -474,14 +714,13 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
     setTimeline(updatedActivities);
 
-    // Check if hydration reminder is active and complete it
-    setReminders((prev) =>
-      prev.map((r) =>
-        r.category === 'hydration' && !r.isCompleted
-          ? { ...r, isCompleted: true, dueTime: `Completed at ${timeDisplay}` }
-          : r
-      )
+    // Auto-complete active hydration reminders
+    const hydReminder = reminders.find(
+      (r) => r.category === 'hydration' && r.status !== 'completed' && r.status !== 'dismissed'
     );
+    if (hydReminder) {
+      await completeReminder(hydReminder.id);
+    }
 
     recalculateWellnessScore();
   };
@@ -494,47 +733,7 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
     recalculateWellnessScore();
   };
 
-  // Reminders management
-  const completeReminder = (id: string) => {
-    const now = new Date();
-    const timeDisplay = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    setReminders((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, isCompleted: true, dueTime: `Completed at ${timeDisplay}` } : r))
-    );
-
-    const targetReminder = reminders.find((r) => r.id === id);
-    if (targetReminder) {
-      addTimelineItem({
-        title: `Completed: ${targetReminder.title}`,
-        description: targetReminder.description,
-        category:
-          targetReminder.category === 'hydration'
-            ? 'hydration'
-            : targetReminder.category === 'movement'
-            ? 'movement'
-            : 'break',
-        impact: 'restorative',
-      });
-    }
-    recalculateWellnessScore();
-  };
-
-  const snoozeReminder = (id: string) => {
-    setReminders((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? { ...r, dueTime: 'Snoozed for 15 mins', urgency: 'routine' }
-          : r
-      )
-    );
-  };
-
-  const dismissReminder = (id: string) => {
-    setReminders((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  // Actions management
+  // Actions management (Sprint 1 fallback)
   const toggleActionCompletion = (id: string) => {
     setRecommendedActions((prev) =>
       prev.map((act) => {
@@ -643,6 +842,8 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
   const clearAllStoredData = async () => {
     await workPatternService.clearAllData();
     setTimeline([]);
+    setReminders([]);
+    setToasts([]);
     setFocusSummary({
       totalFocusMinutes: 0,
       targetFocusMinutes: 150,
@@ -780,6 +981,18 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
         completeReminder,
         snoozeReminder,
         dismissReminder,
+        toasts,
+        dismissToast,
+        completeToast,
+        snoozeToast,
+        notificationSettings,
+        updateNotificationSettings,
+        browserPermission,
+        requestBrowserNotificationPermission,
+        reminderStats,
+        refreshReminderStats,
+        contextualRecommendations,
+        toggleContextualRecommendation,
         timeline,
         timelineCategoryFilter,
         setTimelineCategoryFilter,
