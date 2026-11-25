@@ -23,6 +23,13 @@ import {
   ReminderEffectivenessStats,
 } from '../types/reminders';
 import {
+  DailyWellnessPlan,
+  AIInsightsDashboardData,
+  AIConsentSettings,
+  AIHealthStatus,
+  AIPersonalizationPayload,
+} from '../types/ai';
+import {
   ActivityEvent,
   FocusSessionRecord,
   HydrationRecord,
@@ -46,6 +53,7 @@ import {
   wellnessReminderService,
   DEFAULT_NOTIFICATION_SETTINGS,
 } from '../services/reminders/wellnessReminderService';
+import { aiService } from '../services/ai/aiService';
 import { useAppActiveTimeTracker } from '../hooks/useAppActiveTimeTracker';
 
 interface TrackingStateInfo {
@@ -143,6 +151,23 @@ interface WellnessContextType {
 
   // Insights
   insights: WellnessInsightItem[];
+
+  // Sprint 4: AI-Powered Personalization & Daily Plan
+  dailyPlan: DailyWellnessPlan | null;
+  isAiGeneratingPlan: boolean;
+  generateDailyPlan: (forceRefresh?: boolean) => Promise<DailyWellnessPlan>;
+  togglePlanItem: (
+    itemType: 'focus' | 'break' | 'movement' | 'recovery',
+    itemId: string
+  ) => Promise<void>;
+
+  aiInsights: AIInsightsDashboardData | null;
+  isAiGeneratingInsights: boolean;
+  refreshAiInsights: () => Promise<void>;
+
+  aiConsent: AIConsentSettings;
+  updateAiConsent: (hasConsented: boolean) => Promise<void>;
+  aiHealth: AIHealthStatus;
 
   // Real-time tracking status & storage tools
   trackingStatus: TrackingStateInfo;
@@ -251,6 +276,21 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Mood Entries
   const [moodEntries, setMoodEntries] = useState<MoodEntry[]>(initialMoodEntries);
   const [insights] = useState<WellnessInsightItem[]>(initialInsights);
+
+  // Sprint 4: AI Personalization States
+  const [dailyPlan, setDailyPlan] = useState<DailyWellnessPlan | null>(null);
+  const [isAiGeneratingPlan, setIsAiGeneratingPlan] = useState(false);
+  const [aiInsights, setAiInsights] = useState<AIInsightsDashboardData | null>(null);
+  const [isAiGeneratingInsights, setIsAiGeneratingInsights] = useState(false);
+  const [aiConsent, setAiConsent] = useState<AIConsentSettings>({
+    hasConsented: false,
+    consentedAt: null,
+    allowAnonymizedMetrics: false,
+  });
+  const [aiHealth, setAiHealth] = useState<AIHealthStatus>({
+    available: false,
+    provider: 'fallback',
+  });
 
   // Active in-app usage tracker hook
   const trackingStatus = useAppActiveTimeTracker(true);
@@ -482,6 +522,70 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
           setNotificationSettings(savedNotifSettings);
         }
 
+        // Restore AI consent and health (Sprint 4)
+        const consent = await aiService.getConsentSettings();
+        setAiConsent(consent);
+        const health = await aiService.checkHealth();
+        setAiHealth(health);
+
+        // Restore or initialize daily plan
+        const storedPlan = await storage.getDailyPlan(todayKey);
+        if (storedPlan) {
+          setDailyPlan(storedPlan);
+        } else {
+          const initialPayload: AIPersonalizationPayload = {
+            userGoals: mockUserProfile.dailyGoals,
+            todayMetrics: {
+              focusMinutes: initialFocusSummary.totalFocusMinutes,
+              focusSessionCount: initialFocusSummary.completedSessions,
+              averageSessionMinutes: initialFocusSummary.averageSessionLengthMinutes,
+              screenTimeMinutes: initialScreenTimeData.totalMinutes,
+              inAppActiveMinutes: initialScreenTimeData.inAppActiveMinutes,
+              continuousStrainMinutes: initialScreenTimeData.activeContinuousMinutes,
+              hydrationGlasses: 5,
+              breakCount: 6,
+              wellnessScore: initialWellnessScore.overall,
+            },
+            recentMoodSummary: {
+              latestMoodLevel: 4,
+              latestMoodLabel: 'Energized',
+              averageMoodScore: 3.8,
+            },
+          };
+          const plan = await aiService.generateDailyPlan(initialPayload);
+          await storage.saveDailyPlan(plan);
+          setDailyPlan(plan);
+        }
+
+        // Restore or initialize AI insights
+        const storedInsights = await storage.getLatestAIInsights();
+        if (storedInsights) {
+          setAiInsights(storedInsights);
+        } else {
+          const initialPayload: AIPersonalizationPayload = {
+            userGoals: mockUserProfile.dailyGoals,
+            todayMetrics: {
+              focusMinutes: initialFocusSummary.totalFocusMinutes,
+              focusSessionCount: initialFocusSummary.completedSessions,
+              averageSessionMinutes: initialFocusSummary.averageSessionLengthMinutes,
+              screenTimeMinutes: initialScreenTimeData.totalMinutes,
+              inAppActiveMinutes: initialScreenTimeData.inAppActiveMinutes,
+              continuousStrainMinutes: initialScreenTimeData.activeContinuousMinutes,
+              hydrationGlasses: 5,
+              breakCount: 6,
+              wellnessScore: initialWellnessScore.overall,
+            },
+            recentMoodSummary: {
+              latestMoodLevel: 4,
+              latestMoodLabel: 'Energized',
+              averageMoodScore: 3.8,
+            },
+          };
+          const insightsData = await aiService.generateInsights(initialPayload);
+          await storage.saveAIInsights(insightsData);
+          setAiInsights(insightsData);
+        }
+
         await refreshAnalytics();
         setIsStorageInitialized(true);
       } catch {
@@ -690,6 +794,169 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
       };
     });
   }, [hydration.currentGlasses, hydration.targetGlasses, focusSummary.completedSessions, focusSummary.targetSessions]);
+
+  // Sprint 4: Build AI Context Payload from real telemetry metrics
+  const buildAIPayload = useCallback((): AIPersonalizationPayload => {
+    const latestMood = moodEntries[moodEntries.length - 1];
+    const avgMood =
+      moodEntries.length > 0
+        ? moodEntries.reduce((sum, m) => sum + m.level, 0) / moodEntries.length
+        : 4;
+
+    return {
+      userGoals: user.dailyGoals,
+      todayMetrics: {
+        focusMinutes: focusSummary.totalFocusMinutes,
+        focusSessionCount: focusSummary.completedSessions,
+        averageSessionMinutes: focusSummary.averageSessionLengthMinutes,
+        screenTimeMinutes: screenTime.totalMinutes,
+        inAppActiveMinutes: screenTime.inAppActiveMinutes,
+        continuousStrainMinutes: screenTime.activeContinuousMinutes,
+        hydrationGlasses: hydration.currentGlasses,
+        breakCount: user.dailyGoals.breaksCount,
+        wellnessScore: wellnessScore.overall,
+      },
+      recentMoodSummary: latestMood
+        ? {
+            latestMoodLevel: latestMood.level,
+            latestMoodLabel: latestMood.label,
+            averageMoodScore: Math.round(avgMood * 10) / 10,
+          }
+        : undefined,
+      weeklyAggregates: {
+        dailyAverages: {
+          screenTimeHours: Math.round((screenTime.totalMinutes / 60) * 10) / 10,
+          focusHours: Math.round((focusSummary.totalFocusMinutes / 60) * 10) / 10,
+          wellnessScore: wellnessScore.overall,
+        },
+      },
+    };
+  }, [
+    user.dailyGoals,
+    focusSummary,
+    screenTime,
+    hydration.currentGlasses,
+    wellnessScore.overall,
+    moodEntries,
+  ]);
+
+  // Sprint 4: Generate Daily Wellness Plan
+  const generateDailyPlan = useCallback(
+    async (forceRefresh = false): Promise<DailyWellnessPlan> => {
+      const todayKey = getDateKey();
+      if (!forceRefresh) {
+        const cached = await storage.getDailyPlan(todayKey);
+        if (cached) {
+          setDailyPlan(cached);
+          return cached;
+        }
+      }
+
+      setIsAiGeneratingPlan(true);
+      try {
+        const payload = buildAIPayload();
+        const plan = await aiService.generateDailyPlan(payload);
+        await storage.saveDailyPlan(plan);
+        setDailyPlan(plan);
+        return plan;
+      } finally {
+        setIsAiGeneratingPlan(false);
+      }
+    },
+    [buildAIPayload]
+  );
+
+  // Sprint 4: Toggle Plan Item completion and log activity
+  const togglePlanItem = useCallback(
+    async (itemType: 'focus' | 'break' | 'movement' | 'recovery', itemId: string) => {
+      if (!dailyPlan) return;
+
+      let completedItemTitle = '';
+      const updatedPlan: DailyWellnessPlan = {
+        ...dailyPlan,
+        focusBlocks: dailyPlan.focusBlocks.map((b) => {
+          if (itemType === 'focus' && b.id === itemId) {
+            const nextState = !b.isCompleted;
+            if (nextState) completedItemTitle = b.title;
+            return { ...b, isCompleted: nextState };
+          }
+          return b;
+        }),
+        breakIntervals: dailyPlan.breakIntervals.map((br) => {
+          if (itemType === 'break' && br.id === itemId) {
+            const nextState = !br.isCompleted;
+            if (nextState) completedItemTitle = br.title;
+            return { ...br, isCompleted: nextState };
+          }
+          return br;
+        }),
+        movementRecommendations: dailyPlan.movementRecommendations.map((m) => {
+          if (itemType === 'movement' && m.id === itemId) {
+            const nextState = !m.isCompleted;
+            if (nextState) completedItemTitle = m.title;
+            return { ...m, isCompleted: nextState };
+          }
+          return m;
+        }),
+        recoverySuggestions: dailyPlan.recoverySuggestions.map((r) => {
+          if (itemType === 'recovery' && r.id === itemId) {
+            const nextState = !r.isCompleted;
+            if (nextState) completedItemTitle = r.title;
+            return { ...r, isCompleted: nextState };
+          }
+          return r;
+        }),
+      };
+
+      setDailyPlan(updatedPlan);
+      await storage.saveDailyPlan(updatedPlan);
+
+      if (completedItemTitle) {
+        const catMap = {
+          focus: 'focus',
+          break: 'break',
+          movement: 'movement',
+          recovery: 'wellbeing',
+        } as const;
+
+        await addTimelineItem({
+          title: `Plan Completed: ${completedItemTitle}`,
+          description: `Successfully executed scheduled ${itemType} ritual.`,
+          category: catMap[itemType],
+          impact: itemType === 'focus' ? 'positive' : 'restorative',
+        });
+        await refreshAnalytics();
+        recalculateWellnessScore();
+      }
+    },
+    [dailyPlan, addTimelineItem, refreshAnalytics, recalculateWellnessScore]
+  );
+
+  // Sprint 4: Refresh AI Insights
+  const refreshAiInsights = useCallback(async () => {
+    setIsAiGeneratingInsights(true);
+    try {
+      const payload = buildAIPayload();
+      const insightsData = await aiService.generateInsights(payload);
+      await storage.saveAIInsights(insightsData);
+      setAiInsights(insightsData);
+    } finally {
+      setIsAiGeneratingInsights(false);
+    }
+  }, [buildAIPayload]);
+
+  // Sprint 4: Update AI Consent Settings
+  const updateAiConsent = useCallback(async (hasConsented: boolean) => {
+    const newConsent: AIConsentSettings = {
+      hasConsented,
+      consentedAt: hasConsented ? new Date().toISOString() : null,
+      allowAnonymizedMetrics: hasConsented,
+    };
+    await aiService.saveConsentSettings(newConsent);
+    setAiConsent(newConsent);
+    const health = await aiService.checkHealth();
+    setAiHealth(health);
+  }, []);
 
   // Log Glass of Water with persistence
   const logGlassOfWater = async () => {
@@ -1007,6 +1274,16 @@ export const WellnessProvider: React.FC<{ children: ReactNode }> = ({ children }
         moodEntries,
         logMood,
         insights,
+        dailyPlan,
+        isAiGeneratingPlan,
+        generateDailyPlan,
+        togglePlanItem,
+        aiInsights,
+        isAiGeneratingInsights,
+        refreshAiInsights,
+        aiConsent,
+        updateAiConsent,
+        aiHealth,
         trackingStatus,
         clearAllStoredData,
         exportStoredData,

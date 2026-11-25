@@ -15,6 +15,9 @@ import {
   Moon,
   Volume2,
   VolumeX,
+  Sparkles,
+  Cpu,
+  Lock,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { Card } from '../common/Card';
@@ -33,6 +36,11 @@ export const SettingsView: React.FC = () => {
     updateNotificationSettings,
     browserPermission,
     requestBrowserNotificationPermission,
+    aiConsent,
+    updateAiConsent,
+    aiHealth,
+    generateDailyPlan,
+    refreshAiInsights,
   } = useWellness();
 
   const [maxScreenHours, setMaxScreenHours] = useState(
@@ -155,7 +163,7 @@ export const SettingsView: React.FC = () => {
             <div className="flex justify-between py-1.5">
               <span>Storage Driver</span>
               <span className="font-medium text-emerald-700 flex items-center gap-1">
-                <Database className="w-3 h-3" /> IndexedDB v2 Active
+                <Database className="w-3 h-3" /> IndexedDB v3 Active
               </span>
             </div>
           </div>
@@ -481,6 +489,91 @@ export const SettingsView: React.FC = () => {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* AI Personalization & Data Privacy Controls (Sprint 4) */}
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-sage-50 text-sage-700">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900">
+                    AI Personalization & Privacy Guardrails
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Configure intelligent recommendations and cloud boundary controls
+                  </p>
+                </div>
+              </div>
+              {aiHealth.available ? (
+                <Badge variant="sage" size="sm" icon={<Cpu className="w-3 h-3 text-sage-600" />}>
+                  Provider: {aiHealth.provider} ({aiHealth.model || 'active'})
+                </Badge>
+              ) : (
+                <Badge variant="sand" size="sm">
+                  🌱 Local Deterministic Engine
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Consent Toggle */}
+              <div className="p-3.5 rounded-xl bg-sand-50/80 border border-sand-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="font-semibold text-stone-900 block flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-stone-500" />
+                    Allow AI Telemetry Personalization
+                  </span>
+                  <p className="text-[11px] text-stone-600 leading-relaxed max-w-lg">
+                    When enabled, Mindora transmits only anonymous aggregate statistics (such as focus durations, session counts, and general mood ratings) to the configured server AI provider to generate tailored daily plans and rhythm insights.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updateAiConsent(!aiConsent.hasConsented)}
+                  className={`px-4 py-2 rounded-xl font-semibold text-xs transition-colors cursor-pointer self-start sm:self-auto shrink-0 ${
+                    aiConsent.hasConsented
+                      ? 'bg-sage-600 text-white shadow-xs hover:bg-sage-700'
+                      : 'bg-sand-200 text-stone-700 hover:bg-sand-300'
+                  }`}
+                >
+                  {aiConsent.hasConsented ? 'Consent Granted ✓' : 'Consent Disabled'}
+                </button>
+              </div>
+
+              {/* Privacy Notice Invariant */}
+              <div className="p-3.5 rounded-xl bg-stone-50 border border-sand-200 text-stone-600 space-y-1 text-[11px] leading-relaxed">
+                <span className="font-semibold text-stone-800 block">Strict Privacy Invariants:</span>
+                <p>• Keystroke logs, screen captures, and application content are <strong>never</strong> collected.</p>
+                <p>• API keys are strictly kept on the server and are <strong>never</strong> transmitted to the client.</p>
+                <p>• If consent is revoked or disabled, 100% of wellness plans and insights are computed locally using the deterministic fallback engine.</p>
+              </div>
+
+              {/* Regenerate Plan & Insights */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <div>
+                  <span className="font-semibold text-stone-800 block">Recalibrate AI Profile</span>
+                  <span className="text-stone-500 text-[11px]">
+                    Force refresh daily wellness plan and behavioral insights with latest metrics
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      generateDailyPlan(true);
+                      refreshAiInsights();
+                    }}
+                    className="text-xs"
+                  >
+                    Recalibrate Plan & Insights
+                  </Button>
                 </div>
               </div>
             </div>

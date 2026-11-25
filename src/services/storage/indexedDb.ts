@@ -4,10 +4,16 @@ import {
   HydrationRecord,
   AppUsageRecord,
 } from '../../types/tracking';
-import { MoodEntry, AdaptiveReminder, NotificationToast } from '../../types';
+import {
+  MoodEntry,
+  AdaptiveReminder,
+  NotificationToast,
+  DailyWellnessPlan,
+  AIInsightsDashboardData,
+} from '../../types';
 
 const DB_NAME = 'mindora_wellness_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class MindoraStorage {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -82,6 +88,25 @@ class MindoraStorage {
           const notifStore = db.createObjectStore('notification_history', { keyPath: 'id' });
           notifStore.createIndex('by_timestamp', 'timestamp', { unique: false });
           notifStore.createIndex('by_category', 'category', { unique: false });
+        }
+
+        // Sprint 4: AI Daily Plans store
+        if (!db.objectStoreNames.contains('ai_daily_plans')) {
+          const planStore = db.createObjectStore('ai_daily_plans', { keyPath: 'dateKey' });
+          planStore.createIndex('by_generatedAt', 'generatedAt', { unique: false });
+        }
+
+        // Sprint 4: AI Insights cache store
+        if (!db.objectStoreNames.contains('ai_insights_cache')) {
+          const insightStore = db.createObjectStore('ai_insights_cache', { keyPath: 'id' });
+          insightStore.createIndex('by_generatedAt', 'generatedAt', { unique: false });
+        }
+
+        // Sprint 4: Delivered recommendations history to avoid repetition
+        if (!db.objectStoreNames.contains('ai_recommendations_history')) {
+          const recHistStore = db.createObjectStore('ai_recommendations_history', { keyPath: 'id' });
+          recHistStore.createIndex('by_deliveredAt', 'deliveredAt', { unique: false });
+          recHistStore.createIndex('by_hash', 'hash', { unique: false });
         }
       };
 
@@ -455,6 +480,122 @@ class MindoraStorage {
     }
   }
 
+  // --- AI Personalization & Daily Plans (Sprint 4) ---
+
+  async saveDailyPlan(plan: DailyWellnessPlan): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_daily_plans', 'readwrite');
+        const store = tx.objectStore('ai_daily_plans');
+        const req = store.put(plan);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const plans = (this.memoryFallback.get('ai_daily_plans') as DailyWellnessPlan[]) || [];
+      const idx = plans.findIndex((p) => p.dateKey === plan.dateKey);
+      if (idx >= 0) plans[idx] = plan;
+      else plans.unshift(plan);
+      this.memoryFallback.set('ai_daily_plans', plans);
+    }
+  }
+
+  async getDailyPlan(dateKey: string): Promise<DailyWellnessPlan | null> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_daily_plans', 'readonly');
+        const store = tx.objectStore('ai_daily_plans');
+        const req = store.get(dateKey);
+        req.onsuccess = () => resolve((req.result as DailyWellnessPlan) || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const plans = (this.memoryFallback.get('ai_daily_plans') as DailyWellnessPlan[]) || [];
+      return plans.find((p) => p.dateKey === dateKey) || null;
+    }
+  }
+
+  async saveAIInsights(data: AIInsightsDashboardData): Promise<void> {
+    const entry = {
+      id: 'latest_insights',
+      ...data,
+    };
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_insights_cache', 'readwrite');
+        const store = tx.objectStore('ai_insights_cache');
+        const req = store.put(entry);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      this.memoryFallback.set('ai_insights_cache', [entry]);
+    }
+  }
+
+  async getLatestAIInsights(): Promise<AIInsightsDashboardData | null> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_insights_cache', 'readonly');
+        const store = tx.objectStore('ai_insights_cache');
+        const req = store.get('latest_insights');
+        req.onsuccess = () => resolve((req.result as AIInsightsDashboardData) || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('ai_insights_cache') as AIInsightsDashboardData[]) || [];
+      return list[0] || null;
+    }
+  }
+
+  async recordDeliveredRecommendation(category: string, title: string, hash: string): Promise<void> {
+    const record = {
+      id: `rec_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      category,
+      title,
+      hash,
+      deliveredAt: new Date().toISOString(),
+    };
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_recommendations_history', 'readwrite');
+        const store = tx.objectStore('ai_recommendations_history');
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('ai_recommendations_history') as typeof record[]) || [];
+      list.push(record);
+      this.memoryFallback.set('ai_recommendations_history', list);
+    }
+  }
+
+  async getRecentRecommendationHashes(limit = 20): Promise<string[]> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('ai_recommendations_history', 'readonly');
+        const store = tx.objectStore('ai_recommendations_history');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const items = (req.result || []) as Array<{ deliveredAt: string; hash: string }>;
+          items.sort((a, b) => new Date(b.deliveredAt).getTime() - new Date(a.deliveredAt).getTime());
+          resolve(items.slice(0, limit).map((i) => i.hash));
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('ai_recommendations_history') as Array<{ hash: string }>) || [];
+      return list.map((i) => i.hash).slice(0, limit);
+    }
+  }
+
   // --- Seed check & Clear ---
 
   async isDataSeeded(): Promise<boolean> {
@@ -502,6 +643,9 @@ class MindoraStorage {
         'mood_entries',
         'reminders',
         'notification_history',
+        'ai_daily_plans',
+        'ai_insights_cache',
+        'ai_recommendations_history',
       ];
       return new Promise((resolve, reject) => {
         const tx = db.transaction(storeNames, 'readwrite');

@@ -1,5 +1,6 @@
 import React from 'react';
 import { WelcomeSection } from '../dashboard/WelcomeSection';
+import { DailyWellnessPlanCard } from '../dashboard/DailyWellnessPlanCard';
 import { ScreenTimeCard } from '../dashboard/ScreenTimeCard';
 import { FocusSummaryCard } from '../dashboard/FocusSummaryCard';
 import { WellnessScoreCard } from '../dashboard/WellnessScoreCard';
@@ -15,7 +16,10 @@ export const DashboardView: React.FC = () => {
       {/* 1. Personalized Welcome Section */}
       <WelcomeSection />
 
-      {/* 2. Primary Metrics Row: Screen Time, Focus Summary, Daily Wellness Score */}
+      {/* 2. Personalized Daily Wellness Plan (Sprint 4) */}
+      <DailyWellnessPlanCard />
+
+      {/* 3. Primary Metrics Row: Screen Time, Focus Summary, Daily Wellness Score */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ScreenTimeCard />
         <FocusSummaryCard />

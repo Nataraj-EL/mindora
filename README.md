@@ -58,17 +58,41 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
 - **IndexedDB v2 Persistence**: Added `reminders` and `notification_history` object stores to persist reminder lifecycle states, snooze timers, and compliance history across refreshes.
 - **Effectiveness & Compliance Metrics**: Live statistics widget tracking completion rates, snooze frequencies, and total wellness actions completed.
 
+### Sprint 4: AI-Powered Wellness Personalization & Adaptive Daily Planning (Completed)
+- **Modular Server-Side AIService & LLM Integration**:
+  - Abstract `IAIProvider` interface with working **Google Gemini API** (`gemini-1.5-flash`) integration and support for OpenAI and Ollama.
+  - Strict security isolation: API keys reside exclusively on the server and are never exposed in frontend code.
+  - Dual server integration: standalone Node.js server (`server/index.mjs`) and zero-overhead Vite dev server middleware plugin (`mindoraAiServerPlugin`).
+- **Deterministic Fallback Engine (`DeterministicFallbackEngine`)**:
+  - High-accuracy local rule-based intelligence ensuring seamless offline operation, error resilience, and complete functionality when external AI is unavailable or unconfigured.
+  - Dynamically adjusts focus intervals (25m Pomodoro sprints vs 45m deep flow) based on detected strain and fatigue.
+- **Personalized Daily Wellness Plan (`DailyWellnessPlanCard`)**:
+  - Interactive dashboard card with recommended focus blocks, restorative breaks, hydration milestones, eye-care pacing, and movement protocols.
+  - One-click "Start Sprint" focus timer launching directly from planned focus blocks.
+  - Real-time ritual completion progress bar with automatic timeline logging.
+- **AI Insights Dashboard (`InsightsView`)**:
+  - Full behavioral analytics dashboard clearly differentiating **✨ AI Observations** from **📊 Measured Telemetry**.
+  - Weekly behavioral summary with Circadian Peak Flow (09:30 - 11:45 AM) and Post-Prandial Fatigue Dip windows.
+  - Prioritized wellness improvement opportunities and intervention adherence statistics.
+- **Privacy & Safety Invariants**:
+  - User consent controls in Settings with data minimization (anonymized numeric metrics only; zero keystrokes, zero screenshots, zero private notes).
+  - Prominent Non-Medical Disclaimer banner ensuring wellness advice is never presented as clinical or medical conclusions.
+- **IndexedDB v3 Storage**:
+  - Added `ai_daily_plans`, `ai_insights_cache`, and `ai_recommendations_history` object stores to persist plans and prevent repetitive suggestions across refreshes.
+
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
 - **Core Framework**: React 18 + TypeScript (Strict Type Safety)
-- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v2) with zero third-party bundle overhead
+- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v3) with 10 dedicated Object Stores
 - **Styling**: Tailwind CSS with custom calming wellness theme tokens
 - **Build Tool**: Vite 6 (ultra-fast HMR and optimized production bundles)
+- **Server Layer**: Node.js HTTP server (`server/index.mjs`) + Vite dev middleware plugin
+- **AI Intelligence**: Server-side Google Gemini REST integration (`gemini-1.5-flash`), OpenAI, Ollama, and `DeterministicFallbackEngine`
 - **Icons**: Lucide React
 - **Audio Synthesis**: Native Web Audio API (528Hz harmonic oscillator)
-- **Telemetry Engine**: Modular `WorkPatternService` + `BrowserInAppTelemetryProvider` decoupled from presentation layer
+- **Telemetry Engine**: Modular `WorkPatternService` + `BrowserInAppTelemetryProvider`
 - **Adaptive Reminder Engine**: Decoupled `WellnessReminderService` + Web Notifications API + in-app toast stack
 
 ---
@@ -79,7 +103,7 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
 - Node.js `v18.0.0` or higher (tested on Node v22)
 - npm `v9.0.0` or higher
 
-### Installation
+### Installation & Setup
 
 1. **Clone the repository**:
    ```bash
@@ -92,23 +116,35 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
    npm install
    ```
 
-3. **Start the local development server**:
+3. **Configure Environment Variables (Optional for External AI)**:
+   ```bash
+   cp .env.example .env
+   ```
+   Add your Google Gemini API key if you wish to use cloud AI (`GEMINI_API_KEY=...`).
+   *Note: If no API key is configured or consent is denied, Mindora seamlessly runs on its built-in local deterministic intelligence engine.*
+
+4. **Start the local development server**:
    ```bash
    npm run dev
    ```
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-4. **Run TypeScript type-checking**:
+5. **Run the standalone backend server (Optional / Production)**:
+   ```bash
+   npm run server
+   ```
+
+6. **Run TypeScript type-checking**:
    ```bash
    npm run type-check
    ```
 
-5. **Build for production**:
+7. **Build for production**:
    ```bash
    npm run build
    ```
 
-6. **Preview the production build**:
+8. **Preview the production build**:
    ```bash
    npm run preview
    ```
@@ -119,27 +155,35 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
 
 ```
 mindora/
+├── .env.example                  # Environment configuration template
 ├── docs/
-│   ├── architecture.md           # System architecture, storage decisions, and telemetry contracts
-│   └── SPRINTS.md                # Sprint roadmaps and changelogs
+│   ├── architecture.md           # System architecture, storage schema v3, and security invariants
+│   └── SPRINTS.md                # Sprint roadmaps and execution logs
+├── server/
+│   ├── aiRouter.mjs              # Server AI router (/api/ai/* endpoints)
+│   ├── aiService.mjs             # Modular LLM providers (Gemini, OpenAI, Ollama)
+│   └── index.mjs                 # Standalone Node HTTP server
 ├── src/
 │   ├── components/
 │   │   ├── common/               # Atomic UI components (Badge, Button, Card, ToastContainer, etc.)
-│   │   ├── layout/               # Header (with notification center), Sidebar, MobileNav, AppLayout
-│   │   ├── dashboard/            # RemindersCard, WellnessActionsCard, ScreenTimeCard, FocusSummaryCard, etc.
+│   │   ├── layout/               # Header, Sidebar, MobileNav, AppLayout
+│   │   ├── dashboard/            # DailyWellnessPlanCard, RemindersCard, WellnessActionsCard, etc.
 │   │   └── views/                # DashboardView, MyWellnessView, ActivityView, InsightsView, SettingsView
 │   ├── context/
-│   │   └── WellnessContext.tsx   # Central state, storage hydration, reminder loop & analytics synchronization
+│   │   └── WellnessContext.tsx   # Central state, daily plan, AI insights & storage hydration
 │   ├── data/
 │   │   └── mockData.ts           # Initial baseline and seeding dataset
 │   ├── hooks/
 │   │   ├── useAppActiveTimeTracker.ts  # Presence heartbeat and in-app time tracker
 │   │   └── useWorkPatternTracker.ts    # Reusable analytics and logging hook
 │   ├── services/
+│   │   ├── ai/
+│   │   │   ├── aiService.ts      # Client-side AI orchestrator, consent & network handler
+│   │   │   └── deterministicFallbackEngine.ts # Rule-based local intelligence fallback
 │   │   ├── reminders/
-│   │   │   └── wellnessReminderService.ts # Adaptive reminders, anti-spam throttling, quiet hours & recommendations
+│   │   │   └── wellnessReminderService.ts # Adaptive reminders, anti-spam throttling & quiet hours
 │   │   ├── storage/
-│   │   │   └── indexedDb.ts      # Type-safe native IndexedDB storage engine (v2 with reminders & history)
+│   │   │   └── indexedDb.ts      # Native IndexedDB storage engine (v3 with AI plans & caches)
 │   │   └── tracking/
 │   │       ├── telemetryInterfaces.ts  # ITelemetryProvider and BrowserInAppTelemetryProvider
 │   │       └── workPatternService.ts   # WorkPatternService analytics and event engine
@@ -147,7 +191,8 @@ mindora/
 │   │   └── index.css             # Tailwind base directives and calm styling
 │   ├── types/
 │   │   ├── index.ts              # Core domain models
-│   │   ├── reminders.ts          # Adaptive reminder, notification toast, effectiveness & recommendation types
+│   │   ├── ai.ts                 # Daily plan, AI insights, payload & provider types
+│   │   ├── reminders.ts          # Adaptive reminder, notification toast & effectiveness types
 │   │   └── tracking.ts           # ActivityEvent, FocusSessionRecord, Analytics, and Telemetry types
 │   ├── App.tsx                   # Main view router
 │   └── main.tsx                  # Application entry point

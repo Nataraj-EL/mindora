@@ -57,39 +57,62 @@
   - Rescheduling workflows for **Snooze** (+15m, +30m) and **Dismiss**.
 - [x] **Personalized Recommendations with Explicit "Why" Explanations**:
   - Replaced generic suggestions with evidence-based interventions dynamically ranked by fatigue score.
-  - Explicit explanation badge on every card: *"Why this is recommended"* (e.g. *"Critical: You have been looking at screens for 52 uninterrupted minutes without looking away"*).
+  - Explicit explanation badge on every card: *"Why this is recommended"*.
   - Expandable actionable guidance with step-by-step physical and vagal relief instructions.
 - [x] **Multi-Channel Notification System**:
   - Built actionable in-app [`ToastContainer`](file:///home/nataraj/Downloads/Projects/mindora/src/components/common/ToastContainer.tsx) with calm styling and immediate action buttons (`Mark Done`, `Snooze 15m`, `Dismiss`).
-  - Integrated native browser Web Notifications API (`Notification.requestPermission()`, `new Notification()`) with explicit permission toggle.
+  - Integrated native browser Web Notifications API with explicit permission toggle.
   - Enhanced Header with interactive Due Reminders drawer and notification badge.
   - Upgraded IndexedDB to `v2` with `reminders` and `notification_history` stores.
-- [x] **Wellness Dashboard Integration & Adherence Analytics**:
-  - Updated `RemindersCard` with **Due**, **Upcoming**, and **Done** tabs.
-  - Added live intervention compliance statistics: compliance rate adherence %, total completed vs. snoozed vs. dismissed, and top compliant category.
-  - Synchronized completion: completing interventions updates daily scores, logs to activity timeline, and auto-increments hydration.
-- [x] **Quality Assurance & Verification**:
-  - Automated test script verifying generation thresholds, anti-spam cooldowns, snooze/completion states, quiet hours, and recommendations ranking.
-  - Clean TypeScript compilation with strict options (`npm run type-check`).
-  - Production build verification with Vite (`npm run build`).
 
 ---
 
-## 🔮 Sprint 4: Desktop Telemetry Daemon & Multi-Device Sync (Upcoming)
+## 🏁 Sprint 4: AI-Powered Wellness Personalization & Adaptive Daily Planning (Completed)
 
-**Objective**: Provide optional system-wide application tracking via a lightweight native agent and encrypted synchronization.
+**Objective**: Build an AI-powered personalization engine that converts historical work-pattern and wellness data into meaningful, personalized recommendations, interactive daily plans, and behavioral observations while keeping API keys strictly on the server and guaranteeing non-medical safety.
 
-### Planned Scope:
-- **Native Desktop Agent (Electron/Rust)**: Implements `IDesktopTelemetryProvider` to track system-wide foreground application names (e.g. VS Code, Figma, Slack) without browser sandbox limits.
-- **Zero-Knowledge Sync**: End-to-end encrypted backup between workstation and mobile devices.
-- **Focus Shielding**: Automated status sync to communication apps ("Elena is in a Deep Focus block until 11:30 AM").
-- **Team Boundary Health**: Anonymous team-level indicators to prevent meeting overload.
+### Deliverables & Achievements
+- [x] **Server-Side AI Architecture & Provider Abstraction**:
+  - Engineered modular `AIService` abstraction with `IAIProvider` interface pattern.
+  - Implemented working **Google Gemini Provider** (`GeminiProvider`) using the Google Generative Language REST API with structured JSON output schema mode.
+  - Built architecture supporting OpenAI (`OpenAIProvider`) and local models (`OllamaProvider`).
+  - Built dual server execution: standalone Node.js server (`server/index.mjs`) and zero-overhead Vite dev server middleware plugin (`mindoraAiServerPlugin`) so developers never need manual background processes during development.
+  - Strict security isolation: `GEMINI_API_KEY` is kept exclusively on the server and is never sent to or bundled in client code.
+- [x] **Deterministic Fallback Engine (`DeterministicFallbackEngine`)**:
+  - Built pure client-side rule-based intelligence engine providing rich personalized daily plans and rhythm insights when offline, when the server is unavailable, or when the user opts out of external AI.
+  - Adapts focus block duration (25m Pomodoro sprints vs 45m deep flow) dynamically based on fatigue levels and continuous strain.
+- [x] **Personalized Daily Wellness Plan (`DailyWellnessPlanCard`)**:
+  - Interactive dashboard widget on `DashboardView` providing:
+    - Recommended focus blocks with direct "Start Sprint" Pomodoro timer integration.
+    - Suggested restorative break intervals (micro-breaks, walks, meals).
+    - Hydration goals paced across the day.
+    - Eye-care schedule (20-20-20 rule prompts).
+    - Movement recommendations (thoracic stretches, hip flexor releases).
+    - Recovery suggestions (4-7-8 parasympathetic vagal reset).
+  - Live ritual adherence progress gauge and interactive checkboxes that automatically log completed rituals to the activity timeline.
+  - "Refresh AI Plan" action with loading indicator and visual badges distinguishing AI-generated vs Local Adaptive plans.
+- [x] **AI Insights Dashboard (`InsightsView`)**:
+  - Upgraded Insights into a full behavioral analytics dashboard.
+  - Visual badges clearly differentiating **✨ AI-Generated Observations** from **📊 Measured Telemetry Metrics**.
+  - Weekly behavioral summary with Circadian Peak Flow (09:30 - 11:45 AM) and Post-Prandial Fatigue Dip (13:45 - 15:15 PM).
+  - Prioritized wellness improvement opportunities with actionable steps.
+  - Recommendation effectiveness metrics tracking delivered count, accepted count, and adherence percentage.
+- [x] **Privacy, Informed Consent & Safety Guardrails**:
+  - Dedicated **AI Personalization & Privacy Guardrails** card in `SettingsView`.
+  - Informed consent toggle: when disabled, zero requests are sent to external providers and plans are computed 100% locally.
+  - Data minimization: sends only anonymous aggregated statistics (total focus minutes, session count, hydration level, mood scores); never collects keystrokes, screen recordings, private text notes, or file names.
+  - Prominent Non-Medical Disclaimer banner: *"Mindora's insights, daily plans, and recommendations are designed solely for workday stamina and ergonomic wellness. They are not medical advice, clinical diagnoses, or psychological treatments."*
+- [x] **Storage Schema Upgrade (IndexedDB v3)**:
+  - Added `ai_daily_plans`, `ai_insights_cache`, and `ai_recommendations_history` object stores to preserve plan states and prevent repetitive suggestions across refreshes.
+- [x] **Verification**:
+  - Automated test suite validating deterministic plan generation, high-strain adaptations, measured telemetry badges, server AI routes, and 503 fallback behavior.
+  - Clean TypeScript check (`npm run type-check`) and production build (`npm run build`).
 
 ---
 
 ## 🔮 Sprint 5: Conversational AI & Circadian Chronotyping (Upcoming)
 
-**Objective**: Integrate on-device or privacy-preserving LLM capabilities to deliver hyper-personalized wellness advice and reflective check-in debriefs.
+**Objective**: Integrate on-device or privacy-preserving natural language capabilities to deliver hyper-personalized wellness advice and reflective end-of-day check-in debriefs.
 
 ### Planned Scope:
 - **Circadian Modeling Engine**: Algorithmic detection of personal chronotypes (lark vs night owl) and cognitive peak windows.

@@ -85,6 +85,7 @@ export interface WellnessScoreData {
 }
 
 export * from './reminders';
+export * from './ai';
 
 export type ActivityCategory = 'focus' | 'break' | 'hydration' | 'movement' | 'wellbeing';
 
