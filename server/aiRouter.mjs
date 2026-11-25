@@ -98,6 +98,31 @@ function sanitizeInsights(raw) {
   };
 }
 
+function sanitizeChatResponse(raw) {
+  return {
+    content: typeof raw?.content === 'string' && raw.content.trim().length > 0
+      ? raw.content
+      : "I'm here to support your mindful focus and recovery today.",
+    guidedExperience: raw?.guidedExperience && typeof raw.guidedExperience.type === 'string'
+      ? {
+          type: raw.guidedExperience.type,
+          title: raw.guidedExperience.title || 'Guided Wellness Reset',
+          category: raw.guidedExperience.category || 'wellbeing',
+          durationSeconds: Number(raw.guidedExperience.durationSeconds) || 180,
+          steps: Array.isArray(raw.guidedExperience.steps)
+            ? raw.guidedExperience.steps.map((s, idx) => ({
+                stepIndex: idx + 1,
+                label: s.label || `Step ${idx + 1}`,
+                durationSeconds: Number(s.durationSeconds) || 5,
+                instruction: s.instruction || 'Follow the rhythm gently.',
+              }))
+            : [],
+        }
+      : undefined,
+    isCrisisHelp: Boolean(raw?.isCrisisHelp),
+  };
+}
+
 /**
  * Handles incoming HTTP request for AI routes
  */
@@ -175,6 +200,34 @@ export async function handleAIRequest(req, res, pathname, body) {
       res.end(JSON.stringify({
         error: err.message || 'Failed to analyze wellness metrics',
         code: 'ANALYSIS_FAILED',
+      }));
+    }
+    return true;
+  }
+
+  // 4. Conversational Chat: POST /api/ai/chat (Sprint 5)
+  if (pathname === '/api/ai/chat' && req.method === 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    if (!provider.isAvailable()) {
+      res.statusCode = 503;
+      res.end(JSON.stringify({
+        error: 'AI Provider is not configured or available',
+        code: 'PROVIDER_UNAVAILABLE',
+      }));
+      return true;
+    }
+
+    try {
+      const { messages, contextPayload } = body || {};
+      const rawResponse = await provider.chat(messages || [], contextPayload || {});
+      const sanitized = sanitizeChatResponse(rawResponse);
+      res.statusCode = 200;
+      res.end(JSON.stringify(sanitized));
+    } catch (err) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({
+        error: err.message || 'Failed to generate chat response',
+        code: 'CHAT_FAILED',
       }));
     }
     return true;

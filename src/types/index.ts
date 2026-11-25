@@ -1,4 +1,4 @@
-export type NavigationTab = 'dashboard' | 'wellness' | 'activity' | 'insights' | 'settings';
+export type NavigationTab = 'dashboard' | 'wellness' | 'activity' | 'insights' | 'companion' | 'settings';
 
 export interface UserProfile {
   id: string;
@@ -86,6 +86,7 @@ export interface WellnessScoreData {
 
 export * from './reminders';
 export * from './ai';
+export * from './conversation';
 
 export type ActivityCategory = 'focus' | 'break' | 'hydration' | 'movement' | 'wellbeing';
 

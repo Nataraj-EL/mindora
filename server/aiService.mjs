@@ -200,6 +200,91 @@ ${JSON.stringify(payload, null, 2)}`;
 
     return JSON.parse(rawText);
   }
+
+  async chat(messages, contextPayload) {
+    if (!this.isAvailable()) {
+      throw new Error('Gemini API key is not configured');
+    }
+
+    const systemPrompt = `You are Mindora, an empathetic and evidence-grounded AI mental wellness & digital ergonomics companion.
+${MEDICAL_SAFETY_INSTRUCTIONS}
+
+ROLE & OPERATING PRINCIPLES:
+1. Tone: Warm, grounded, calming, and concise. Use clear markdown formatting.
+2. Context Awareness: With user consent, you have access to their aggregated metrics below. Use this to provide personalized insights into their focus blocks, breaks, hydration, and fatigue.
+3. Strict Grounding: NEVER hallucinate or invent metrics. If the user asks about a metric not in context, gently explain.
+4. Non-Medical Stance: Remind users you are an ergonomic and cognitive wellness coach, not a doctor or therapist. Never diagnose conditions or prescribe medications.
+5. CRISIS PROTOCOL: If the user indicates self-harm, suicide, severe depression, or acute crisis:
+   - Immediately express deep compassion and concern.
+   - Urge them to connect immediately with human professionals or someone they trust.
+   - Provide these free, confidential, 24/7 hotlines:
+     * US & Canada: Call or text 988 (Suicide & Crisis Lifeline)
+     * UK: Call 111 or Samaritans at 116 123
+     * Crisis Text Line: Text HOME to 741741
+     * International: https://findahelpline.com
+   - Set "isCrisisHelp": true.
+6. GUIDED EXPERIENCES: When the user requests or would benefit from a guided reset (e.g. 4-7-8 breathing, 20-20-20 eye relaxation, neck/shoulder stretch, mindfulness grounding, focus prep, or evening winddown), provide a structured "guidedExperience" object with actionable steps and timings.
+
+CURRENT USER TELEMETRY CONTEXT (Aggregated):
+${JSON.stringify(contextPayload || {}, null, 2)}
+
+OUTPUT JSON SCHEMA:
+{
+  "content": "Conversational markdown response",
+  "guidedExperience": null | {
+    "type": "breathing_478" | "eye_relaxation_202020" | "neck_shoulder_stretch" | "mindfulness_grounding" | "focus_prep" | "evening_winddown",
+    "title": "Experience title",
+    "category": "break" | "movement" | "wellbeing",
+    "durationSeconds": 180,
+    "steps": [
+      {
+        "stepIndex": 1,
+        "label": "Step name",
+        "durationSeconds": 4,
+        "instruction": "Step instruction"
+      }
+    ]
+  },
+  "isCrisisHelp": false
+}
+Return ONLY valid JSON.`;
+
+    const contents = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: '{"content":"Hello, I am Mindora. I am here to support your mindful focus, restorative breaks, and digital ergonomics.","guidedExperience":null,"isCrisisHelp":false}' }] },
+    ];
+
+    for (const msg of messages) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      });
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.5,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Gemini Chat error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) throw new Error('Empty response from Gemini API');
+
+    return JSON.parse(rawText);
+  }
 }
 
 /**
@@ -269,6 +354,29 @@ export class OpenAIProvider {
       }),
     });
     if (!response.ok) throw new Error(`OpenAI error: ${await response.text()}`);
+    const data = await response.json();
+    return JSON.parse(data.choices[0].message.content);
+  }
+
+  async chat(messages, contextPayload) {
+    if (!this.isAvailable()) throw new Error('OpenAI API key is not configured');
+    const systemPrompt = `You are Mindora, an AI-powered personalized mental wellness companion. ${MEDICAL_SAFETY_INSTRUCTIONS} Context: ${JSON.stringify(contextPayload || {})}. Return JSON with content, guidedExperience, isCrisisHelp.`;
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`OpenAI Chat error: ${await response.text()}`);
     const data = await response.json();
     return JSON.parse(data.choices[0].message.content);
   }

@@ -5,6 +5,7 @@ import { DashboardView } from './components/views/DashboardView';
 import { MyWellnessView } from './components/views/MyWellnessView';
 import { ActivityView } from './components/views/ActivityView';
 import { InsightsView } from './components/views/InsightsView';
+import { CompanionView } from './components/views/CompanionView';
 import { SettingsView } from './components/views/SettingsView';
 
 const MainViewRenderer: React.FC = () => {
@@ -19,6 +20,8 @@ const MainViewRenderer: React.FC = () => {
       return <ActivityView />;
     case 'insights':
       return <InsightsView />;
+    case 'companion':
+      return <CompanionView />;
     case 'settings':
       return <SettingsView />;
     default:

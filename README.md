@@ -80,16 +80,35 @@ Modern digital work frequently leads to cognitive fatigue, eye strain, physical 
 - **IndexedDB v3 Storage**:
   - Added `ai_daily_plans`, `ai_insights_cache`, and `ai_recommendations_history` object stores to persist plans and prevent repetitive suggestions across refreshes.
 
+### Sprint 5: Conversational AI Wellness Companion & Guided Resets (Completed)
+- **Dedicated AI Wellness Companion View (`CompanionView`)**:
+  - Full-featured conversational chat interface added to desktop Sidebar and Mobile Navigation.
+  - Multi-session drawer supporting session creation, renaming, deletion, and permanent history erasure.
+  - Typing indicators, timestamps, message copy tools, and clean responsive layout.
+- **Context-Aware Coaching & Metric Grounding**:
+  - Deeply integrated with `ConversationService` and server-side endpoint `POST /api/ai/chat`.
+  - With explicit user consent, provides telemetry context (focus minutes, sessions completed, screen time, hydration, strain) to give tailored advice without inventing false metrics.
+- **Interactive Guided Resets (`GuidedExperienceCard`)**:
+  - Structured interactive players embedded directly within chat bubbles.
+  - Supports **4-7-8 Parasympathetic Breathing**, **20-20-20 Ocular Relief**, **Desk Neck & Shoulder Stretches**, and **Focus-Session Preparation**.
+  - Includes real-time countdown timers, step progress bars, pause/resume, and automatic logging of completed rituals to the activity timeline.
+- **Strict Crisis Safeguards & Medical Boundaries**:
+  - Automated crisis language detection with immediate 24/7 hotline resources (988 Lifeline, 111 NHS, Crisis Text Line 741741, `findahelpline.com`).
+  - Clear lifestyle ergonomics framing with zero clinical diagnoses or psychological treatment claims.
+- **IndexedDB v4 Storage**:
+  - Added `conversations` and `conversation_messages` object stores with complete offline deterministic conversation fallback.
+
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
 - **Core Framework**: React 18 + TypeScript (Strict Type Safety)
-- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v3) with 10 dedicated Object Stores
+- **Client-Side Storage**: Native IndexedDB (`mindora_wellness_db` v4) with 12 dedicated Object Stores
 - **Styling**: Tailwind CSS with custom calming wellness theme tokens
 - **Build Tool**: Vite 6 (ultra-fast HMR and optimized production bundles)
 - **Server Layer**: Node.js HTTP server (`server/index.mjs`) + Vite dev middleware plugin
 - **AI Intelligence**: Server-side Google Gemini REST integration (`gemini-1.5-flash`), OpenAI, Ollama, and `DeterministicFallbackEngine`
+- **Conversational Companion**: Modular `ConversationService` with crisis safeguards and guided reset players
 - **Icons**: Lucide React
 - **Audio Synthesis**: Native Web Audio API (528Hz harmonic oscillator)
 - **Telemetry Engine**: Modular `WorkPatternService` + `BrowserInAppTelemetryProvider`
@@ -166,9 +185,10 @@ mindora/
 ├── src/
 │   ├── components/
 │   │   ├── common/               # Atomic UI components (Badge, Button, Card, ToastContainer, etc.)
+│   │   ├── companion/            # GuidedExperienceCard (Interactive reset timers)
 │   │   ├── layout/               # Header, Sidebar, MobileNav, AppLayout
 │   │   ├── dashboard/            # DailyWellnessPlanCard, RemindersCard, WellnessActionsCard, etc.
-│   │   └── views/                # DashboardView, MyWellnessView, ActivityView, InsightsView, SettingsView
+│   │   └── views/                # DashboardView, MyWellnessView, ActivityView, InsightsView, CompanionView, SettingsView
 │   ├── context/
 │   │   └── WellnessContext.tsx   # Central state, daily plan, AI insights & storage hydration
 │   ├── data/
@@ -180,10 +200,12 @@ mindora/
 │   │   ├── ai/
 │   │   │   ├── aiService.ts      # Client-side AI orchestrator, consent & network handler
 │   │   │   └── deterministicFallbackEngine.ts # Rule-based local intelligence fallback
+│   │   ├── conversation/
+│   │   │   └── conversationService.ts # Conversational companion, crisis detection & fallback
 │   │   ├── reminders/
 │   │   │   └── wellnessReminderService.ts # Adaptive reminders, anti-spam throttling & quiet hours
 │   │   ├── storage/
-│   │   │   └── indexedDb.ts      # Native IndexedDB storage engine (v3 with AI plans & caches)
+│   │   │   └── indexedDb.ts      # Native IndexedDB storage engine (v4 with conversations & messages)
 │   │   └── tracking/
 │   │       ├── telemetryInterfaces.ts  # ITelemetryProvider and BrowserInAppTelemetryProvider
 │   │       └── workPatternService.ts   # WorkPatternService analytics and event engine
@@ -192,6 +214,7 @@ mindora/
 │   ├── types/
 │   │   ├── index.ts              # Core domain models
 │   │   ├── ai.ts                 # Daily plan, AI insights, payload & provider types
+│   │   ├── conversation.ts       # Chat message, conversation session & guided experience types
 │   │   ├── reminders.ts          # Adaptive reminder, notification toast & effectiveness types
 │   │   └── tracking.ts           # ActivityEvent, FocusSessionRecord, Analytics, and Telemetry types
 │   ├── App.tsx                   # Main view router

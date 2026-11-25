@@ -9,6 +9,7 @@ import {
   Pause,
   Leaf,
   Droplets,
+  MessageSquareHeart,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { NavigationTab } from '../../types';
@@ -23,6 +24,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'wellness', label: 'My Wellness', icon: HeartPulse, badge: '87' },
+  { id: 'companion', label: 'AI Companion', icon: MessageSquareHeart, badge: 'AI' },
   { id: 'activity', label: 'Activity', icon: Clock },
   { id: 'insights', label: 'Insights', icon: Sparkles, badge: '4' },
   { id: 'settings', label: 'Settings', icon: Settings },

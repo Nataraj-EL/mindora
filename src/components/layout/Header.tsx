@@ -54,6 +54,10 @@ export const Header: React.FC<HeaderProps> = ({ onMobileMenuToggle }) => {
       title: 'AI Wellness Insights',
       subtitle: 'Personalized ergonomics, peak focus hours, and fatigue patterns',
     },
+    companion: {
+      title: 'AI Wellness Companion',
+      subtitle: 'Conversational ergonomics, guided breathing resets, and mindful support',
+    },
     settings: {
       title: 'Preferences & Work Rituals',
       subtitle: 'Configure daily goals, reminders, storage, and privacy boundaries',

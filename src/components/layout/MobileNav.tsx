@@ -7,6 +7,7 @@ import {
   Settings,
   X,
   Leaf,
+  MessageSquareHeart,
 } from 'lucide-react';
 import { useWellness } from '../../context/WellnessContext';
 import { NavigationTab } from '../../types';
@@ -27,6 +28,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ isOpen, onClose }) => {
   const navItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'wellness' as const, label: 'My Wellness', icon: HeartPulse },
+    { id: 'companion' as const, label: 'AI Companion', icon: MessageSquareHeart },
     { id: 'activity' as const, label: 'Activity', icon: Clock },
     { id: 'insights' as const, label: 'Insights', icon: Sparkles },
     { id: 'settings' as const, label: 'Settings', icon: Settings },

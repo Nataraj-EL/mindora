@@ -110,11 +110,44 @@
 
 ---
 
-## 🔮 Sprint 5: Conversational AI & Circadian Chronotyping (Upcoming)
+## 🏁 Sprint 5: Conversational AI Wellness Companion & Guided Resets (Completed)
 
-**Objective**: Integrate on-device or privacy-preserving natural language capabilities to deliver hyper-personalized wellness advice and reflective end-of-day check-in debriefs.
+**Objective**: Build a conversational AI Wellness Companion integrated with the existing multi-provider AI architecture, supporting interactive guided wellness experiences, persistent conversation management, context-aware coaching, and strict crisis safeguards.
+
+### Deliverables & Achievements
+- [x] **Conversational Interface & UI Integration (`CompanionView`)**:
+  - Dedicated full-featured conversational view accessible via desktop Sidebar and Mobile Navigation.
+  - Multi-session drawer with "+ New Session", rename, and delete actions.
+  - Real-time typing indicators, user/companion avatars, timestamps, and copy actions.
+  - Contextual conversation starters and quick action chips based on today's actual telemetry.
+  - Clear All History modal with permanent IndexedDB erasure.
+- [x] **Context-Aware Coaching & Metric Grounding**:
+  - Connected `ConversationService` with server-side AI endpoint (`POST /api/ai/chat`) and `GeminiProvider`.
+  - When user consent is active, transmits aggregated telemetry metrics (today's focus minutes, completed sessions, average duration, screen time, hydration status, mood scores).
+  - Answers user questions about work stamina and break cadence without hallucinating false metrics.
+- [x] **Interactive Guided Wellness Experiences**:
+  - Built [`GuidedExperienceCard`](file:///home/nataraj/Downloads/Projects/mindora/src/components/companion/GuidedExperienceCard.tsx) rendered inline in chat bubbles.
+  - Supports 4-7-8 parasympathetic breathing resets, 20-20-20 ocular relaxation timers, desk neck/shoulder stretch protocols, and focus-session preparation rituals.
+  - Includes interactive countdown timer player, step progress indicators, pause/resume controls, and automatic logging of completed rituals to the activity timeline.
+- [x] **Strict AI Safety & Crisis Safeguards**:
+  - Immediate client-side and server-side crisis language detection (`CRISIS_PATTERNS`).
+  - Automatically displays emergency support resources (988 Lifeline, 111 NHS, Crisis Text Line 741741, `findahelpline.com`) without hallucinating clinical advice.
+  - Strict non-medical framing: identifies as a digital ergonomics coach, never diagnosing psychiatric or medical conditions.
+- [x] **Conversation Management & IndexedDB v4**:
+  - Upgraded database to `v4` with `conversations` and `conversation_messages` object stores.
+  - Complete persistence across browser refreshes with full offline fallback generation.
+- [x] **Quality Assurance & Verification**:
+  - Automated test suite validating crisis detection, guided experiences structure, context grounding, conversation session lifecycle, and 503 fallback routing.
+  - Strict TypeScript check (`npm run type-check`) and production build (`npm run build`).
+
+---
+
+## 🔮 Sprint 6: Native Desktop Telemetry Daemon & Multi-Device Sync (Upcoming)
+
+**Objective**: Provide optional system-wide application tracking via a lightweight native agent and encrypted synchronization.
 
 ### Planned Scope:
-- **Circadian Modeling Engine**: Algorithmic detection of personal chronotypes (lark vs night owl) and cognitive peak windows.
-- **Mindora Conversational Reflection**: On-device natural language companion for mindful end-of-day retrospectives.
-- **Biometric Connectors**: Optional local sync with health wearables (HRV and sleep readiness scores).
+- **Native Desktop Agent (Electron/Rust)**: Implements `IDesktopTelemetryProvider` to track system-wide foreground application names (e.g. VS Code, Figma, Slack) without browser sandbox limits.
+- **Zero-Knowledge Sync**: End-to-end encrypted backup between workstation and mobile devices.
+- **Focus Shielding**: Automated status sync to communication apps ("Elena is in a Deep Focus block until 11:30 AM").
+- **Team Boundary Health**: Anonymous team-level indicators to prevent meeting overload.

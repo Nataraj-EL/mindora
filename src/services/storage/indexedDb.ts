@@ -10,10 +10,12 @@ import {
   NotificationToast,
   DailyWellnessPlan,
   AIInsightsDashboardData,
+  ConversationMessage,
+  ConversationSession,
 } from '../../types';
 
 const DB_NAME = 'mindora_wellness_db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 class MindoraStorage {
   private dbPromise: Promise<IDBDatabase> | null = null;
@@ -107,6 +109,19 @@ class MindoraStorage {
           const recHistStore = db.createObjectStore('ai_recommendations_history', { keyPath: 'id' });
           recHistStore.createIndex('by_deliveredAt', 'deliveredAt', { unique: false });
           recHistStore.createIndex('by_hash', 'hash', { unique: false });
+        }
+
+        // Sprint 5: Conversational AI Companion stores
+        if (!db.objectStoreNames.contains('conversations')) {
+          const convStore = db.createObjectStore('conversations', { keyPath: 'id' });
+          convStore.createIndex('by_updatedAt', 'updatedAt', { unique: false });
+          convStore.createIndex('by_createdAt', 'createdAt', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains('conversation_messages')) {
+          const msgStore = db.createObjectStore('conversation_messages', { keyPath: 'id' });
+          msgStore.createIndex('by_conversationId', 'conversationId', { unique: false });
+          msgStore.createIndex('by_timestamp', 'timestamp', { unique: false });
         }
       };
 
@@ -596,6 +611,156 @@ class MindoraStorage {
     }
   }
 
+  // --- Sprint 5: Conversational AI Companion ---
+
+  async saveConversation(session: ConversationSession): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversations', 'readwrite');
+        const store = tx.objectStore('conversations');
+        const req = store.put(session);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversations') as ConversationSession[]) || [];
+      const idx = list.findIndex((c) => c.id === session.id);
+      if (idx >= 0) list[idx] = session;
+      else list.unshift(session);
+      this.memoryFallback.set('conversations', list);
+    }
+  }
+
+  async getConversations(): Promise<ConversationSession[]> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversations', 'readonly');
+        const store = tx.objectStore('conversations');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const list = (req.result || []) as ConversationSession[];
+          list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          resolve(list);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversations') as ConversationSession[]) || [];
+      return [...list].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }
+  }
+
+  async getConversation(id: string): Promise<ConversationSession | null> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversations', 'readonly');
+        const store = tx.objectStore('conversations');
+        const req = store.get(id);
+        req.onsuccess = () => resolve((req.result as ConversationSession) || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversations') as ConversationSession[]) || [];
+      return list.find((c) => c.id === id) || null;
+    }
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('conversations', 'readwrite');
+        const store = tx.objectStore('conversations');
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+      await this.deleteMessages(id);
+    } catch {
+      const list = (this.memoryFallback.get('conversations') as ConversationSession[]) || [];
+      this.memoryFallback.set('conversations', list.filter((c) => c.id !== id));
+      await this.deleteMessages(id);
+    }
+  }
+
+  async saveMessage(message: ConversationMessage): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversation_messages', 'readwrite');
+        const store = tx.objectStore('conversation_messages');
+        const req = store.put(message);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversation_messages') as ConversationMessage[]) || [];
+      const idx = list.findIndex((m) => m.id === message.id);
+      if (idx >= 0) list[idx] = message;
+      else list.push(message);
+      this.memoryFallback.set('conversation_messages', list);
+    }
+  }
+
+  async getMessages(conversationId: string): Promise<ConversationMessage[]> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversation_messages', 'readonly');
+        const store = tx.objectStore('conversation_messages');
+        const index = store.index('by_conversationId');
+        const req = index.getAll(conversationId);
+        req.onsuccess = () => {
+          const list = (req.result || []) as ConversationMessage[];
+          list.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+          resolve(list);
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversation_messages') as ConversationMessage[]) || [];
+      return list
+        .filter((m) => m.conversationId === conversationId)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    }
+  }
+
+  async deleteMessages(conversationId: string): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      const messages = await this.getMessages(conversationId);
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('conversation_messages', 'readwrite');
+        const store = tx.objectStore('conversation_messages');
+        messages.forEach((m) => store.delete(m.id));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      const list = (this.memoryFallback.get('conversation_messages') as ConversationMessage[]) || [];
+      this.memoryFallback.set('conversation_messages', list.filter((m) => m.conversationId !== conversationId));
+    }
+  }
+
+  async clearAllConversations(): Promise<void> {
+    try {
+      const db = await this.openDatabase();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(['conversations', 'conversation_messages'], 'readwrite');
+        tx.objectStore('conversations').clear();
+        tx.objectStore('conversation_messages').clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      this.memoryFallback.set('conversations', []);
+      this.memoryFallback.set('conversation_messages', []);
+    }
+  }
+
   // --- Seed check & Clear ---
 
   async isDataSeeded(): Promise<boolean> {
@@ -646,6 +811,8 @@ class MindoraStorage {
         'ai_daily_plans',
         'ai_insights_cache',
         'ai_recommendations_history',
+        'conversations',
+        'conversation_messages',
       ];
       return new Promise((resolve, reject) => {
         const tx = db.transaction(storeNames, 'readwrite');
